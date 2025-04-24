@@ -1,0 +1,6 @@
+/target/
+/project/target/
+/project/project/
+/project/.bloop/
+/.bsp/
+/out/
