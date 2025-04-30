@@ -16,6 +16,26 @@ import java.nio.file.{ Path, Paths }
 def main(path: String): Unit =
   compile(Paths.get(path))
 
+
+enum Expr:
+  case Constant(n: Long)
+  case UnaryOp(op: UnaryOperator, e: Expr)
+  case BinaryOp(left: Expr, op: BinaryOperator, right: Expr)
+  case Call(name: String, args: List[Expr])
+
+enum UnaryOperator:
+  case USub
+
+enum BinaryOperator:
+  case Add
+  case Sub
+
+enum Stmt:
+  case ExprStmt(e: Expr)
+
+case class Module(stmts: List[Stmt])
+
+
 def compile(input: Path): Path = {
   val basename = input.getFileName.toString.replace(".lang", "")
   val source = readFile(input)
