@@ -10,20 +10,21 @@ import x86.Program
 import x86.format
 import x86.assemble
 
-import java.nio.file.{ Path, Paths }
+import java.nio.file.{Path, Paths}
 import compiler.Stmt.*
 import compiler.Expr.*
 import scala.io.StdIn
 
 @main
-def main(path: String): Unit =
-  compile(Paths.get(path))
-
+def main(): Unit =
+  // compile(Paths.get(path))
+  val program = "1+1"
+  print(parse(program))
 
 enum Expr:
   case Constant(n: Long)
   case UnaryOp(op: UnaryOperator, e: Expr)
-  case BinaryOp(left: Expr, op: BinaryOperator, right: Expr)
+  case BinaryOp(op: BinaryOperator, left: Expr, right: Expr)
   case Call(name: String, args: List[Expr])
 
 enum UnaryOperator:
@@ -39,69 +40,70 @@ enum Stmt:
 case class Module(stmts: List[Stmt])
 
 def readExpression(sexpr: SExp): Expr = sexpr match
-  case Number(n) => Constant(n)
-  case Node(Symbol("Call") :: Symbol(name) :: argsNode :: Nil) =>
+  case Node(List(Symbol("Constant"), Number(n))) => Constant(n)
+  case Node(
+        Symbol("Call") :: Node(
+          Symbol("Variable") :: Symbol(name) :: Nil
+        ) :: argsNode :: Nil
+      ) =>
     val args = argsNode match
       case Node(elements) => elements.map(readExpression)
-      case _ => sys error "invalid argument list" + argsNode
+      case _              => sys error "invalid argument list" + argsNode
     Call(name, args)
   // UnaryOp
-  case Node(List(Symbol("-"), e)) => 
+  case Node(Symbol("Unary") :: Symbol("Neg") :: e :: Nil) =>
     UnaryOp(UnaryOperator.USub, readExpression(e))
   // Additon
-  case Node(List(l, Symbol("+"), r)) => 
-    BinaryOp(readExpression(l), BinaryOperator.Add, readExpression(r))
+  case Node(Symbol("Binary") :: Symbol("Add") :: l :: r :: Nil) =>
+    BinaryOp(BinaryOperator.Add, readExpression(l), readExpression(r))
   // Substraction
-  case Node(List(l, Symbol("-"), r)) => 
-    BinaryOp(readExpression(l), BinaryOperator.Sub, readExpression(r))
-  case Symbol(name) => 
-    Call(name, Nil)
-  case Node(List(inner)) => readExpression(inner)
+  case Node(Symbol("Binary") :: Symbol("Sub") :: l :: r :: Nil) =>
+    BinaryOp(BinaryOperator.Sub, readExpression(l), readExpression(r))
   case other => sys error "invalid expression" + other
 
 def readStatement(sexpr: SExp): Stmt = sexpr match
-  case Node(List(Symbol("Expr"), e)) => 
-    ExprStmt(readExpression(e))
-  case other => sys error "invalid statement: " + other
- 
+  case Node(List(Node(List(Symbol("Expr"), exprNode)))) =>
+    ExprStmt(readExpression(exprNode))
+  case other =>
+    sys.error("invalid statement: " + other)
+
 def readModule(sexpr: SExp): Module = sexpr match
   case Node(Symbol("Module") :: stmtSexps) =>
     val stmts = stmtSexps.map(readStatement)
     Module(stmts)
-  case other => 
-    sys error "invalid Module: " + other 
-
+  case other =>
+    sys error "invalid Module: " + other
 
 def evalExpr(e: Expr): Long = e match
-  case Constant(n) => n
-  case UnaryOp(UnaryOperator.USub, e) => - evalExpr(e)
-  case BinaryOp(left, BinaryOperator.Add, right) => evalExpr(left) + evalExpr(right)
-  case BinaryOp(left, BinaryOperator.Sub, right) => evalExpr(left) - evalExpr(right)
+  case Constant(n)                    => n
+  case UnaryOp(UnaryOperator.USub, e) => -evalExpr(e)
+  case BinaryOp(BinaryOperator.Add, left, right) =>
+    evalExpr(left) + evalExpr(right)
+  case BinaryOp(BinaryOperator.Sub, left, right) =>
+    evalExpr(left) - evalExpr(right)
   case Call("print", args) =>
     val evArgs = args.map(evalExpr)
-    println(evArgs.mkString(" ")) 
+    println(evArgs.mkString(" "))
     0L
   case Call("input_int", Nil) => StdIn.readInt().toLong
-  case Call(f, _) => sys error "unknown function call " + f
+  case Call(f, _)             => sys error "unknown function call " + f
 
 def partialEval(e: Expr): Expr = e match
-  case c @ Constant(n) => c
+  case c @ Constant(n)            => c
   case i @ Call("input_int", Nil) => i
   case UnaryOp(UnaryOperator.USub, e) =>
     partialEval(e) match
-        case Constant(n) => Constant(-n)
-        case expr        => UnaryOp(UnaryOperator.USub, expr)
-  case BinaryOp(left, BinaryOperator.Add, right) =>
+      case Constant(n) => Constant(-n)
+      case expr        => UnaryOp(UnaryOperator.USub, expr)
+  case BinaryOp(BinaryOperator.Add, left, right) =>
     (partialEval(left), partialEval(right)) match
-        case (Constant(a), Constant(b)) => Constant(a + b)
-        case (left, right)              => BinaryOp(left, BinaryOperator.Add, right)
-  case BinaryOp(left, BinaryOperator.Sub, right) =>
+      case (Constant(a), Constant(b)) => Constant(a + b)
+      case (left, right) => BinaryOp(BinaryOperator.Add, left, right)
+  case BinaryOp(BinaryOperator.Sub, left, right) =>
     (partialEval(left), partialEval(right)) match
-        case (Constant(a), Constant(b)) => Constant(a - b)
-        case (left, right)              => BinaryOp(left, BinaryOperator.Sub, right)
+      case (Constant(a), Constant(b)) => Constant(a - b)
+      case (left, right) => BinaryOp(BinaryOperator.Sub, left, right)
   case other => other
-
-
 
 def compile(input: Path): Path = {
   val basename = input.getFileName.toString.replace(".lang", "")
@@ -111,29 +113,43 @@ def compile(input: Path): Path = {
 }
 
 def replaceMeWithTheActualCompilation(prog: SExp): Program = prog match {
-  case Node(List(
-      Symbol("Module"),
-      Node(List(Node(List(
-        Symbol("Expr"),
-        Node(List(
-          Symbol("Call"),
-          Node(List(Symbol("Variable"), Symbol("print"))),
-          Node(List(Node(List(Symbol("Constant"), Number(42)))))
-        ))
-      ))))
-    )) =>
-    Program(Map("main" -> List(
-      PushQ(Register(Rbp)),
-      MovQ(Register(Rsp), Register(Rbp)),
-      SubQ(Immediate(16), Register(Rsp)),
-      MovQ(Immediate(42), Register(Rax)),
-      MovQ(Register(Rax), Register(Rdi)),
-      CallQ("print_int", 1),
-      MovQ(Immediate(0), Register(Rax)),
-      AddQ(Immediate(16), Register(Rsp)),
-      PopQ(Register(Rbp)),
-      RetQ
-    )))
+  case Node(
+        List(
+          Symbol("Module"),
+          Node(
+            List(
+              Node(
+                List(
+                  Symbol("Expr"),
+                  Node(
+                    List(
+                      Symbol("Call"),
+                      Node(List(Symbol("Variable"), Symbol("print"))),
+                      Node(List(Node(List(Symbol("Constant"), Number(42)))))
+                    )
+                  )
+                )
+              )
+            )
+          )
+        )
+      ) =>
+    Program(
+      Map(
+        "main" -> List(
+          PushQ(Register(Rbp)),
+          MovQ(Register(Rsp), Register(Rbp)),
+          SubQ(Immediate(16), Register(Rsp)),
+          MovQ(Immediate(42), Register(Rax)),
+          MovQ(Register(Rax), Register(Rdi)),
+          CallQ("print_int", 1),
+          MovQ(Immediate(0), Register(Rax)),
+          AddQ(Immediate(16), Register(Rsp)),
+          PopQ(Register(Rbp)),
+          RetQ
+        )
+      )
+    )
   case _ => ???
 }
 

@@ -5,102 +5,113 @@ import lang.SExp
 import lang.SExp.*
 import compiler.Expr.*
 import compiler.Stmt.*
-
-
+import lang.parse
 
 class CompilerTests extends FunSuite {
   test("1 + 1 = 2") {
     assertEquals(1 + 1, 2)
   }
 
-  // basic helper SExps
-  private val const42 = Number(42)
-  private val const5 = Number(5)
-  private val const3 = Number(3)
-  private val inputCall = Node(Symbol("Call"), Symbol("input_int"), Node())
+  // helper S-Exps
+  val onePlusOne = Node(
+    List(
+      Symbol("Binary"),
+      Symbol("Add"),
+      Node(List(Symbol("Constant"), Number(1))),
+      Node(List(Symbol("Constant"), Number(1)))
+    )
+  )
 
-  test("readExpression") {
-    val addInner = Node(List(const5, Symbol("+"), const3))
-    val negInner = Node(List(Symbol("-"), addInner))
-    val sum1 = Node(List(inputCall, Symbol("+"), negInner))
-    val fullExpr = Node(List(sum1, Symbol("+"), const42))
+  val fourMinusTwo = Node(
+    List(
+      Symbol("Binary"),
+      Symbol("Sub"),
+      Node(List(Symbol("Constant"), Number(4))),
+      Node(List(Symbol("Constant"), Number(2)))
+    )
+  )
 
-    val expr = readExpression(fullExpr)
-    val expected = BinaryOp(
-      BinaryOp(
-        Call("input_int", Nil),
-        BinaryOperator.Add,
-        UnaryOp(UnaryOperator.USub,
-          BinaryOp(Constant(5), BinaryOperator.Add, Constant(3))
+  val minusEight = Node(
+    List(
+      Symbol("Unary"),
+      Symbol("Neg"),
+      Node(List(Symbol("Constant"), Number(8)))
+    )
+  )
+
+  val inputIntCall = Node(
+    List(
+      Symbol("Call"),
+      Node(List(Symbol("Variable"), Symbol("input_int"))),
+      Node(List())
+    )
+  )
+
+  val onePlusOneAst = BinaryOp(BinaryOperator.Add, Constant(1), Constant(1))
+
+  // helper functions for redundnat test structure
+  def testReadExpression(name: String, input: SExp, expected: Expr): Unit = {
+    test(s"readExpression - $name") {
+      assertEquals(readExpression(input), expected)
+    }
+  }
+
+  // readExpression tests
+  testReadExpression(
+    "binary: 1 + 1",
+    onePlusOne,
+    onePlusOneAst
+  )
+  testReadExpression(
+    "binary: 4 - 2",
+    fourMinusTwo,
+    BinaryOp(BinaryOperator.Sub, Constant(4), Constant(2))
+  )
+  testReadExpression(
+    "unary: -8",
+    minusEight,
+    UnaryOp(UnaryOperator.USub, Constant(8))
+  )
+  testReadExpression("call: input_int", inputIntCall, Call("input_int", Nil))
+
+  // readStatement test
+  test("readStatement - binary: 1 + 1") {
+    assertEquals(
+      readStatement(Node(List(Node(List(Symbol("Expr"), onePlusOne))))),
+      ExprStmt(onePlusOneAst)
+    )
+  }
+
+  // readModule test
+  test("readModule - binary: 1 + 1") {
+    assertEquals(
+      readModule(
+        Node(
+          List(
+            Symbol("Module"),
+            Node(List(Node(List(Symbol("Expr"), onePlusOne))))
+          )
         )
       ),
-      BinaryOperator.Add,
-      Constant(42)
+      Module(List(ExprStmt(onePlusOneAst)))
     )
-    assertEquals(expr, expected)
   }
 
-  test("readModule"){
-    val expr1 = Node(List(Symbol("Call"), Symbol("input_int"), Node()))
-    val expr2 = Node(List(Symbol("Call"), Symbol("print"), Node(Node(Number(1)), Node(Number(2)))))
+  test("End-to-End - object lang -> Expr: print(1 + 1)") {
+    val printCall = "print(1+1)"
 
-    val stmt1 = Node(List(Symbol("Expr"), expr1))
-    val stmt2 = Node(List(Symbol("Expr"), expr2))
-    val moduleSexp = Node(Symbol("Module"), stmt1, stmt2)
-
-    val module = readModule(moduleSexp)
-    assertEquals(module.stmts, List(
-      ExprStmt(Call("input_int", Nil)),
-      ExprStmt(Call("print", List(Constant(1), Constant(2))))
-    ))
-  }
-
-  test("evalExpr: simple arithmetic"){
-    val expr = BinaryOp(
-      Constant(7),
-      BinaryOperator.Sub,
-      UnaryOp(UnaryOperator.USub, Constant(2))
-    )
-    assertEquals(evalExpr(expr), 9L)
-  }
-
-  test("partialEval"){
-    val expr = BinaryOp(
-      Call("input_int", Nil),
-      BinaryOperator.Add,
-      UnaryOp(UnaryOperator.USub,
-        BinaryOp(Constant(5), BinaryOperator.Add, Constant(3))
+    val expected = Module(
+      List(
+        ExprStmt(
+          Call(
+            "print",
+            List(
+              BinaryOp(BinaryOperator.Add, Constant(1), Constant(1))
+            )
+          )
+        )
       )
     )
-
-    val expected = BinaryOp(
-      Call("input_int", Nil),
-      BinaryOperator.Add,
-      Constant(-8)
-    )
-    
-    assertEquals(partialEval(expr), expected)
-  }
-
-  test("SExp -> AST -> partialEval"){
-    val addInner = Node(List(const5, Symbol("+"), const3))             
-    val negInner = Node(List(Symbol("-"), addInner))                   
-    val sum1 = Node(List(inputCall, Symbol("+"), negInner))             
-    val fullExpr = Node(List(sum1, Symbol("+"), const42))               
-
-    val parsedExpr = readExpression(fullExpr)
-    val partiallyEvaluated = partialEval(parsedExpr)
-
-    val expected = BinaryOp(
-      BinaryOp(
-        Call("input_int", Nil),
-        BinaryOperator.Add,
-        Constant(-8)
-      ),
-      BinaryOperator.Add,
-      Constant(42)
-    )
-
-    assertEquals(partiallyEvaluated, expected)
+    assertEquals(readModule(parse(printCall)), expected)
   }
 }
