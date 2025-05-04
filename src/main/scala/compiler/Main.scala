@@ -18,8 +18,8 @@ import scala.io.StdIn
 @main
 def main(): Unit =
   // compile(Paths.get(path))
-  val program = "1+1"
-  print(parse(program))
+  val programm = "1 + (4 + 2) - 4"
+  println(evalModule(readModule(parse(programm))))
 
 enum Expr:
   case Constant(n: Long)
@@ -40,7 +40,9 @@ enum Stmt:
 case class Module(stmts: List[Stmt])
 
 def readExpression(sexpr: SExp): Expr = sexpr match
+  // constand values
   case Node(List(Symbol("Constant"), Number(n))) => Constant(n)
+  // function calls
   case Node(
         Symbol("Call") :: Node(
           Symbol("Variable") :: Symbol(name) :: Nil
@@ -76,17 +78,23 @@ def readModule(sexpr: SExp): Module = sexpr match
 
 def evalExpr(e: Expr): Long = e match
   case Constant(n)                    => n
-  case UnaryOp(UnaryOperator.USub, e) => -evalExpr(e)
-  case BinaryOp(BinaryOperator.Add, left, right) =>
-    evalExpr(left) + evalExpr(right)
-  case BinaryOp(BinaryOperator.Sub, left, right) =>
-    evalExpr(left) - evalExpr(right)
+  case UnaryOp(op, e) => op match
+    case UnaryOperator.USub => -1 * evalExpr(e)
+  case BinaryOp(op, left, right) => op match
+    case BinaryOperator.Add => evalExpr(left) + evalExpr(right)
+    case BinaryOperator.Sub => evalExpr(left) - evalExpr(right)
   case Call("print", args) =>
     val evArgs = args.map(evalExpr)
     println(evArgs.mkString(" "))
     0L
   case Call("input_int", Nil) => StdIn.readInt().toLong
   case Call(f, _)             => sys error "unknown function call " + f
+
+def evalStatement(stmt: Stmt): Long = stmt match
+  case ExprStmt(e) => evalExpr(e)
+
+def evalModule(module: Module): Long = module match
+  case Module(stmts) => stmts.map(evalStatement).lastOption.getOrElse(0L)
 
 def partialEval(e: Expr): Expr = e match
   case c @ Constant(n)            => c

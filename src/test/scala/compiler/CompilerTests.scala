@@ -13,7 +13,7 @@ class CompilerTests extends FunSuite {
   }
 
   // helper S-Exps
-  val onePlusOne = Node(
+  val sexpOnePlusOne = Node(
     List(
       Symbol("Binary"),
       Symbol("Add"),
@@ -22,7 +22,7 @@ class CompilerTests extends FunSuite {
     )
   )
 
-  val fourMinusTwo = Node(
+  val sexpFourMinusTwo = Node(
     List(
       Symbol("Binary"),
       Symbol("Sub"),
@@ -31,7 +31,7 @@ class CompilerTests extends FunSuite {
     )
   )
 
-  val minusEight = Node(
+  val sexpMinusEight = Node(
     List(
       Symbol("Unary"),
       Symbol("Neg"),
@@ -39,7 +39,7 @@ class CompilerTests extends FunSuite {
     )
   )
 
-  val inputIntCall = Node(
+  val sexpInputIntCall = Node(
     List(
       Symbol("Call"),
       Node(List(Symbol("Variable"), Symbol("input_int"))),
@@ -59,25 +59,29 @@ class CompilerTests extends FunSuite {
   // readExpression tests
   testReadExpression(
     "binary: 1 + 1",
-    onePlusOne,
+    sexpOnePlusOne,
     onePlusOneAst
   )
   testReadExpression(
     "binary: 4 - 2",
-    fourMinusTwo,
+    sexpFourMinusTwo,
     BinaryOp(BinaryOperator.Sub, Constant(4), Constant(2))
   )
   testReadExpression(
     "unary: -8",
-    minusEight,
+    sexpMinusEight,
     UnaryOp(UnaryOperator.USub, Constant(8))
   )
-  testReadExpression("call: input_int", inputIntCall, Call("input_int", Nil))
+  testReadExpression(
+    "call: input_int",
+    sexpInputIntCall,
+    Call("input_int", Nil)
+  )
 
   // readStatement test
   test("readStatement - binary: 1 + 1") {
     assertEquals(
-      readStatement(Node(List(Node(List(Symbol("Expr"), onePlusOne))))),
+      readStatement(Node(List(Node(List(Symbol("Expr"), sexpOnePlusOne))))),
       ExprStmt(onePlusOneAst)
     )
   }
@@ -89,7 +93,7 @@ class CompilerTests extends FunSuite {
         Node(
           List(
             Symbol("Module"),
-            Node(List(Node(List(Symbol("Expr"), onePlusOne))))
+            Node(List(Node(List(Symbol("Expr"), sexpOnePlusOne))))
           )
         )
       ),
@@ -97,6 +101,21 @@ class CompilerTests extends FunSuite {
     )
   }
 
+  // interpreter tests
+  test("evalExpr - binary: 1 + 1") {
+    assertEquals(evalExpr(readExpression(sexpOnePlusOne)), 2L)
+  }
+
+  test("evalExpr - binary: 4 - 2"){
+    assertEquals(evalExpr(readExpression(sexpFourMinusTwo)), 2L)
+  }
+
+  test("evalExpr - unary: -8"){
+    assertEquals(evalExpr(readExpression(sexpMinusEight)), -8L)
+  }
+    
+
+  // end-to-end tests
   test("End-to-End - object lang -> Expr: print(1 + 1)") {
     val printCall = "print(1+1)"
 
@@ -113,5 +132,10 @@ class CompilerTests extends FunSuite {
       )
     )
     assertEquals(readModule(parse(printCall)), expected)
+  }
+
+  test("End-to-End - object lang -> Long"){
+    val programm = "1 + (4 - 2) - (-8)"
+    assertEquals(evalModule(readModule(parse(programm))), 11L)
   }
 }
