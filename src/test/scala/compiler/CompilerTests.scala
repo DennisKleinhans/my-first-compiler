@@ -3,17 +3,25 @@ package compiler
 import munit.FunSuite
 import lang.SExp
 import lang.SExp.*
-import compiler.Expr.*
-import compiler.Stmt.*
 import lang.parse
-import scala.collection.immutable.Stream.Cons
+import compiler.AST.*
+import compiler.AST.Expr.*
+import compiler.AST.Stmt.*
+import compiler.{LIntReader, LIntInterpreter}
 
 class CompilerTests extends FunSuite {
+
+  // ───────────────────────────────────────────────────────────────
+  // ─── Basic Sanity Check ────────────────────────────────────────
+  // ───────────────────────────────────────────────────────────────
   test("1 + 1 = 2") {
     assertEquals(1 + 1, 2)
   }
 
-  // helper S-Exps
+  // ───────────────────────────────────────────────────────────────
+  // ─── S-Expression Fixtures ─────────────────────────────────────
+  // ───────────────────────────────────────────────────────────────
+
   val sexpOnePlusOne = Node(
     List(
       Symbol("Binary"),
@@ -50,47 +58,48 @@ class CompilerTests extends FunSuite {
 
   val onePlusOneAst = BinaryOp(BinaryOperator.Add, Constant(1), Constant(1))
 
-  // helper functions for redundnat test structure
+  // ───────────────────────────────────────────────────────────────
+  // ─── LIntReader Tests ──────────────────────────────────────────
+  // ───────────────────────────────────────────────────────────────
+
   def testReadExpression(name: String, input: SExp, expected: Expr): Unit = {
-    test(s"readExpression - $name") {
-      assertEquals(readExpression(input), expected)
+    test(s"LIntReader.fromSExpToExpr - $name") {
+      assertEquals(LIntReader.fromSExpToExpr(input), expected)
     }
   }
 
-  // readExpression tests
-  testReadExpression(
-    "binary: 1 + 1",
-    sexpOnePlusOne,
-    onePlusOneAst
-  )
+  testReadExpression("binary: 1 + 1", sexpOnePlusOne, onePlusOneAst)
+
   testReadExpression(
     "binary: 4 - 2",
     sexpFourMinusTwo,
     BinaryOp(BinaryOperator.Sub, Constant(4), Constant(2))
   )
+
   testReadExpression(
     "unary: -8",
     sexpMinusEight,
     UnaryOp(UnaryOperator.USub, Constant(8))
   )
+
   testReadExpression(
     "call: input_int",
     sexpInputIntCall,
     Call("input_int", Nil)
   )
 
-  // readStatement test
-  test("readStatement - binary: 1 + 1") {
+  test("LIntReader.readStatement - ExprStmt") {
     assertEquals(
-      readStatement(Node(List(Node(List(Symbol("Expr"), sexpOnePlusOne))))),
+      LIntReader.fromSExpToStmt(
+        Node(List(Node(List(Symbol("Expr"), sexpOnePlusOne))))
+      ),
       ExprStmt(onePlusOneAst)
     )
   }
 
-  // readModule test
-  test("readModule - binary: 1 + 1") {
+  test("LIntReader.readModule - single print expr") {
     assertEquals(
-      readModule(
+      LIntReader.fromSExpToModule(
         Node(
           List(
             Symbol("Module"),
@@ -102,63 +111,87 @@ class CompilerTests extends FunSuite {
     )
   }
 
-  // interpreter tests
-  test("evalExpr - binary: 1 + 1") {
-    assertEquals(evalExpr(readExpression(sexpOnePlusOne)), 2L)
+  // ───────────────────────────────────────────────────────────────
+  // ─── LIntInterpreter Tests ─────────────────────────────────────
+  // ───────────────────────────────────────────────────────────────
+
+  test("LIntInterpreter.evalExpr - binary: 1 + 1") {
+    assertEquals(
+      LIntInterpreter.evalExpr(LIntReader.fromSExpToExpr(sexpOnePlusOne)),
+      2L
+    )
   }
 
-  test("evalExpr - binary: 4 - 2") {
-    assertEquals(evalExpr(readExpression(sexpFourMinusTwo)), 2L)
+  test("LIntInterpreter.evalExpr - binary: 4 - 2") {
+    assertEquals(
+      LIntInterpreter.evalExpr(LIntReader.fromSExpToExpr(sexpFourMinusTwo)),
+      2L
+    )
   }
 
-  test("evalExpr - unary: -8") {
-    assertEquals(evalExpr(readExpression(sexpMinusEight)), -8L)
+  test("LIntInterpreter.evalExpr - unary: -8") {
+    assertEquals(
+      LIntInterpreter.evalExpr(LIntReader.fromSExpToExpr(sexpMinusEight)),
+      -8L
+    )
   }
 
-  test("evalModule - print statement") {
+  test("LIntInterpreter.evalModule - print statement") {
     val input = "print(1 + 2)"
     val expectedOutput = "3\n"
 
     val outputStream = new java.io.ByteArrayOutputStream()
     Console.withOut(outputStream) {
-      evalModule(readModule(parse(input)))
+      LIntInterpreter.evalModule(LIntReader.fromSExpToModule(parse(input)))
     }
 
     val actualOutput = outputStream.toString
     assertEquals(actualOutput, expectedOutput)
   }
 
-  // partial evaluator tests
-  test("partialEvalExpr - constant folding") {
+  // ───────────────────────────────────────────────────────────────
+  // ─── Partial Evaluation Tests ──────────────────────────────────
+  // ───────────────────────────────────────────────────────────────
+
+  test("LIntInterpreter.partialEvalExpr - constant folding") {
     val input = BinaryOp(BinaryOperator.Add, Constant(1), Constant(2))
     val expected = Constant(3)
-    assertEquals(partialEvalExpr(input), expected)
+    assertEquals(LIntInterpreter.partialEvalExpr(input), expected)
   }
 
-  test("partialEvalExpr - nested folding") {
+  test("LIntInterpreter.partialEvalExpr - nested folding") {
     val input = BinaryOp(
       BinaryOperator.Sub,
       BinaryOp(BinaryOperator.Add, Constant(2), Constant(3)),
       Constant(1)
     )
     val expected = Constant(4)
-    assertEquals(partialEvalExpr(input), expected)
+    assertEquals(LIntInterpreter.partialEvalExpr(input), expected)
   }
 
-  test("partialEvalExpr - symbolic parts remain") {
-    val input = BinaryOp(BinaryOperator.Add, BinaryOp(BinaryOperator.Add, Constant(1), Constant(2)), Call("input_int", List.empty))
-    val expected = BinaryOp(BinaryOperator.Add, Constant(3), Call("input_int", List.empty))
-    assertEquals(partialEvalExpr(input), expected)
+  test("LIntInterpreter.partialEvalExpr - symbolic parts remain") {
+    val input = BinaryOp(
+      BinaryOperator.Add,
+      BinaryOp(BinaryOperator.Add, Constant(1), Constant(2)),
+      Call("input_int", List.empty)
+    )
+    val expected =
+      BinaryOp(BinaryOperator.Add, Constant(3), Call("input_int", List.empty))
+    assertEquals(LIntInterpreter.partialEvalExpr(input), expected)
   }
 
-  test("partialEvalStatement - print is preserved and partially simplified") {
-    val input = PrintStmt(BinaryOp(BinaryOperator.Sub, Constant(5), Constant(3)))
+  test("LIntInterpreter.partialEvalStatement - partially simplified print") {
+    val input =
+      PrintStmt(BinaryOp(BinaryOperator.Sub, Constant(5), Constant(3)))
     val expected = PrintStmt(Constant(2))
-    assertEquals(partialEvalStatement(input), expected)
+    assertEquals(LIntInterpreter.partialEvalStatement(input), expected)
   }
 
-  // end-to-end tests
-  test("End-to-End - object lang -> Expr: print(1 + 1)") {
+  // ───────────────────────────────────────────────────────────────
+  // ─── End-to-End Tests ──────────────────────────────────────────
+  // ───────────────────────────────────────────────────────────────
+
+  test("End-to-End: object language -> AST - print(1 + 1)") {
     val printCall = "print(1+1)"
 
     val expected = Module(
@@ -168,11 +201,14 @@ class CompilerTests extends FunSuite {
         )
       )
     )
-    assertEquals(readModule(parse(printCall)), expected)
+    assertEquals(LIntReader.fromSExpToModule(parse(printCall)), expected)
   }
 
-  test("End-to-End - object lang -> Long") {
-    val programm = "1 + (4 - 2) - (-8)"
-    assertEquals(evalModule(readModule(parse(programm))), 11L)
+  test("End-to-End: object language -> eval result") {
+    val program = "1 + (4 - 2) - (-8)"
+    assertEquals(
+      LIntInterpreter.evalModule(LIntReader.fromSExpToModule(parse(program))),
+      11L
+    )
   }
 }
