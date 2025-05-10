@@ -27,6 +27,7 @@ object LIntInterpreter {
     case Call("input_int", Nil) => StdIn.readInt().toLong
     case Call(f, _) =>
       sys error s"unknown function call: $f"
+    case other => sys error s"evaluation of expression $other not supported"
 
   /** Fully evaluates a statement
     *
@@ -38,6 +39,7 @@ object LIntInterpreter {
   def evalStatement(stmt: Stmt): Long | Unit = stmt match
     case ExprStmt(e)  => evalExpr(e)
     case PrintStmt(e) => println(evalExpr(e))
+    case other => sys error s"evaluation of statement $other not supported"
 
   /** Fully evaluates a module
     *
@@ -91,6 +93,7 @@ object LIntInterpreter {
   def partialEvalStatement(stmt: Stmt): Stmt = stmt match
     case ExprStmt(e)  => ExprStmt(partialEvalExpr(e))
     case PrintStmt(e) => PrintStmt(partialEvalExpr(e))
+    case other => sys error s"evaluation of statement $other not supported"
 
   /** Partially evaluates all statements in a module
     *

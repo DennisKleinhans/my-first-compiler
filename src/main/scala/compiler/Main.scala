@@ -16,8 +16,10 @@ import AST.Expr.*
 import scala.io.StdIn
 
 @main
-def main(path: String): Unit =
-  compile(Paths.get(path))
+def main(): Unit =
+  val program = "x = 1"
+  println(parse(program))
+  // compile(Paths.get(path))
 
 def compile(input: Path): Path = {
   val basename = input.getFileName.toString.replace(".lang", "")

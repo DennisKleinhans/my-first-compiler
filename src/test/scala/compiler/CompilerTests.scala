@@ -112,6 +112,60 @@ class CompilerTests extends FunSuite {
   }
 
   // ───────────────────────────────────────────────────────────────
+  // ─── LVarReader Tests ──────────────────────────────────────────
+  // ───────────────────────────────────────────────────────────────
+
+  test("LVarReader.fromSExpToExpr") {
+    assertEquals(
+      LVarReader.fromSExpToExpr(Node(List(Symbol("Variable"), Symbol("x")))),
+      Variable("x")
+    )
+  }
+
+  test("LVarReader.fromSExpToStmt") {
+    assertEquals(
+      LVarReader.fromSExpToStmt(
+        Node(
+          List(
+            Node(
+              List(
+                Symbol("Assign"),
+                Symbol("x"),
+                Node(List(Symbol("Constant"), Number(1)))
+              )
+            )
+          )
+        )
+      ),
+      AssignStmt("x", Constant(1))
+    )
+  }
+
+  test("LVarReader.fromSExptoModule") {
+    assertEquals(
+      LVarReader.fromSExpToModule(
+        Node(
+          List(
+            Symbol("Module"),
+            Node(
+              List(
+                Node(
+                  List(
+                    Symbol("Assign"),
+                    Symbol("x"),
+                    Node(List(Symbol("Constant"), Number(1)))
+                  )
+                )
+              )
+            )
+          )
+        )
+      ),
+      Module(List(AssignStmt("x", Constant(1))))
+    )
+  }
+
+  // ───────────────────────────────────────────────────────────────
   // ─── LIntInterpreter Tests ─────────────────────────────────────
   // ───────────────────────────────────────────────────────────────
 
