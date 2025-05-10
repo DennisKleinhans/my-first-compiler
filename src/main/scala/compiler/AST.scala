@@ -33,6 +33,15 @@ object AST {
       */
     case PrintStmt(e: Expr)
 
+    /** An assignment statement that assigns a value to a variable.
+      *
+      * @param name
+      *   the name of the variable to assign to
+      * @param e
+      *   the expression whose value will be assigned
+      */
+    case AssignStmt(name: String, e: Expr)
+
   /** An expression in LInt can be a constant value, a unary operation, a binary
     * operation, or a function call.
     */
@@ -72,6 +81,13 @@ object AST {
       *   the arguments passed to the function
       */
     case Call(name: String, args: List[Expr])
+
+    /** A variable reference.
+      *
+      * @param name
+      *   the name of the variable
+      */
+    case Variable(name: String)
 
   /** A unary operator represents an operation with a single operand. */
   enum UnaryOperator:
