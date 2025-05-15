@@ -1,9 +1,10 @@
 package compiler
 
-import compiler.LVar.Expr.*
-import compiler.LVar.Stmt.*
+import LVar.*
+import LVar.Expr.*
+import LVar.Stmt.*
+import CommonOperators.*
 import scala.io.StdIn
-import compiler.LVar.*
 
 /** Evaluates and partially evaluates LInt programs */
 object LIntInterpreter {
@@ -24,7 +25,7 @@ object LIntInterpreter {
       op match
         case BinaryOperator.Add => evalExpr(lhs) + evalExpr(rhs)
         case BinaryOperator.Sub => evalExpr(lhs) - evalExpr(rhs)
-    case Call("input_int", Nil) => StdIn.readInt().toLong
+    case Call(Identifier("input_int"), Nil) => StdIn.readInt().toLong
     case Call(f, _) =>
       sys error s"unknown function call: $f"
     case other => sys error s"evaluation of expression $other not supported"
@@ -60,8 +61,8 @@ object LIntInterpreter {
     *   a simplified [[Expr]]
     */
   def partialEvalExpr(e: Expr): Expr = e match
-    case c @ Constant(_)            => c
-    case i @ Call("input_int", Nil) => i
+    case c @ Constant(_)                        => c
+    case i @ Call(Identifier("input_int"), Nil) => i
     case UnaryOp(op, e) =>
       val simplified = partialEvalExpr(e)
       op match

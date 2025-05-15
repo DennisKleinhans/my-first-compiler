@@ -2,10 +2,10 @@ package compiler
 
 import lang.SExp
 import lang.SExp.*
-import compiler.LVar
-import compiler.LVar.*
-import compiler.LVar.Expr.*
-import compiler.LVar.Stmt.*
+import LVar.*
+import LVar.Expr.*
+import LVar.Stmt.*
+import CommonOperators.*
 
 /** A trait for converting S-Expressions into expressions [[Expr]], statements
   * [[Stmt]], and modules [[Module]]. This trait provides a default structure
@@ -78,7 +78,7 @@ object LIntReader extends Reader {
       val args = argsNode match
         case Node(elements) => elements.map(fromSExpToExpr)
         case _              => sys.error("invalid argument list: " + argsNode)
-      Call(name, args)
+      Call(Identifier(name), args)
     case Node(Symbol("Unary") :: Symbol("Neg") :: e :: Nil) =>
       UnaryOp(UnaryOperator.USub, fromSExpToExpr(e))
     case Node(Symbol("Binary") :: Symbol("Add") :: lhs :: rhs :: Nil) =>
@@ -113,8 +113,8 @@ object LIntReader extends Reader {
   def fromSExpToStmt(sexpr: SExp): Stmt = sexpr match
     case Node(List(Node(Symbol("Expr") :: exprNode :: Nil))) =>
       fromSExpToExpr(exprNode) match
-        case Call("print", List(arg)) => PrintStmt(arg)
-        case other                    => ExprStmt(other)
+        case Call(Identifier("print"), List(arg)) => PrintStmt(arg)
+        case other                                => ExprStmt(other)
     case other =>
       sys.error("invalid statement: " + other)
 
@@ -163,7 +163,8 @@ object LVarReader extends Reader {
     *   if the expression is invalid
     */
   def fromSExpToExpr(sexp: SExp): Expr = sexp match
-    case Node(Symbol("Variable") :: Symbol(name) :: Nil) => Variable(name)
+    case Node(Symbol("Variable") :: Symbol(name) :: Nil) =>
+      Variable(Identifier(name))
     case other => LIntReader.fromSExpToExpr(other)
 
     /** Converts an S-Expression into a corresponding [[Stmt]].
@@ -185,7 +186,7 @@ object LVarReader extends Reader {
     case Node(
           List(Node(Symbol("Assign") :: Symbol(name) :: assignExpr :: Nil))
         ) =>
-      AssignStmt(name, fromSExpToExpr(assignExpr))
+      AssignStmt(Identifier(name), fromSExpToExpr(assignExpr))
     case other => LIntReader.fromSExpToStmt(other)
 
   def fromSExpToModule(sexp: SExp): Module = sexp match

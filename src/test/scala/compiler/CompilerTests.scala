@@ -6,7 +6,7 @@ import lang.SExp.*
 import lang.parse
 import compiler.LVar.*
 import compiler.LVar.Expr.*
-import compiler.LVar.BinaryOperator.*
+import compiler.CommonOperators.*
 import compiler.LVar.Stmt.*
 import compiler.{LIntReader, LIntInterpreter}
 
@@ -86,7 +86,7 @@ class CompilerTests extends FunSuite {
   testReadExpression(
     "call: input_int",
     sexpInputIntCall,
-    Call("input_int", Nil)
+    Call(Identifier("input_int"), Nil)
   )
 
   test("LIntReader.readStatement - ExprStmt") {
@@ -119,7 +119,7 @@ class CompilerTests extends FunSuite {
   test("LVarReader.fromSExpToExpr") {
     assertEquals(
       LVarReader.fromSExpToExpr(Node(List(Symbol("Variable"), Symbol("x")))),
-      Variable("x")
+      Variable(Identifier("x"))
     )
   }
 
@@ -138,7 +138,7 @@ class CompilerTests extends FunSuite {
           )
         )
       ),
-      AssignStmt("x", Constant(1))
+      AssignStmt(Identifier("x"), Constant(1))
     )
   }
 
@@ -162,7 +162,7 @@ class CompilerTests extends FunSuite {
           )
         )
       ),
-      Module(List(AssignStmt("x", Constant(1))))
+      Module(List(AssignStmt(Identifier("x"), Constant(1))))
     )
   }
 
@@ -228,10 +228,14 @@ class CompilerTests extends FunSuite {
     val input = BinaryOp(
       BinaryOperator.Add,
       BinaryOp(BinaryOperator.Add, Constant(1), Constant(2)),
-      Call("input_int", List.empty)
+      Call(Identifier("input_int"), List.empty)
     )
     val expected =
-      BinaryOp(BinaryOperator.Add, Constant(3), Call("input_int", List.empty))
+      BinaryOp(
+        BinaryOperator.Add,
+        Constant(3),
+        Call(Identifier("input_int"), List.empty)
+      )
     assertEquals(LIntInterpreter.partialEvalExpr(input), expected)
   }
 
@@ -250,34 +254,43 @@ class CompilerTests extends FunSuite {
     val expected = LMonVar.Module(
       List(
         LMonVar.Stmt.AssignStmt(
-          "$tmp$_1",
+          LMonVar.Expr.Identifier("$tmp$_1"),
           LMonVar.Expr
-            .BinaryOp(Add, LMonVar.Atom.Constant(2), LMonVar.Atom.Constant(2))
+            .BinaryOp(
+              BinaryOperator.Add,
+              LMonVar.Atom.Constant(2),
+              LMonVar.Atom.Constant(2)
+            )
         ),
         LMonVar.Stmt.AssignStmt(
-          "$tmp$_2",
+          LMonVar.Expr.Identifier("$tmp$_2"),
           LMonVar.Expr.BinaryOp(
-            Add,
+            BinaryOperator.Add,
             LMonVar.Atom.Constant(1),
-            LMonVar.Atom.Variable("$tmp$_1")
+            LMonVar.Atom.Variable(LMonVar.Expr.Identifier("$tmp$_1"))
           )
         ),
         LMonVar.Stmt.AssignStmt(
-          "$tmp$_3",
+          LMonVar.Expr.Identifier("$tmp$_3"),
           LMonVar.Expr.BinaryOp(
-            Sub,
-            LMonVar.Atom.Variable("$tmp$_2"),
+            BinaryOperator.Sub,
+            LMonVar.Atom.Variable(LMonVar.Expr.Identifier("$tmp$_2")),
             LMonVar.Atom.Constant(8)
           )
         ),
         LMonVar.Stmt.ExprStmt(
-          LMonVar.Expr.AtomExpr(LMonVar.Atom.Variable("$tmp$_3"))
+          LMonVar.Expr.AtomExpr(
+            LMonVar.Atom.Variable(LMonVar.Expr.Identifier("$tmp$_3"))
+          )
         )
       )
     )
     val program = "1 + (2+2) -8"
 
-    assertEquals(simplifyModule(LVarReader.fromSExpToModule(parse(program))), expected)
+    assertEquals(
+      simplifyModule(LVarReader.fromSExpToModule(parse(program))),
+      expected
+    )
   }
 
   // ───────────────────────────────────────────────────────────────
