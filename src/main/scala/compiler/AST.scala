@@ -65,21 +65,20 @@ object LMonVar {
   enum Stmt:
     case AssignStmt(name: String, rhs: Expr)
     case PrintStmt(a: Atom)
-    case ExprStmt(a: Atom)
-
-  /** An atom in LMonVar can be a constant value or a variable reference. */
-  enum Atom:
-    case Constant(n: Long)
-    case Variable(name: String)
+    case ExprStmt(e: Expr)
 
   /** An expression in LMonVar can be a constant value, a unary operation, a
     * binary operation, or a function call with the restriction to only accept
     * atoms.
     */
   enum Expr:
-    case UnaryOp(op: UnaryOperator, lhs: Atom, rhs: Atom)
+    case UnaryOp(op: UnaryOperator, a: Atom)
     case BinaryOp(op: BinaryOperator, lhs: Atom, rhs: Atom)
     case Call(name: String, args: List[Atom])
     case AtomExpr(a: Atom)
 
+  /** An atom in LMonVar can be a constant value or a variable reference. */
+  enum Atom:
+    case Constant(n: Long)
+    case Variable(name: String)
 }

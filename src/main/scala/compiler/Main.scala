@@ -19,6 +19,8 @@ import scala.io.StdIn
 import LVar.UnaryOperator
 import LVar.BinaryOperator
 import LVar.Stmt
+import LMonVar.Expr.AtomExpr
+import compiler.LMonVar.Atom
 
 @main
 def main(): Unit =
@@ -30,6 +32,15 @@ var counter = 0
 def freshName(): String =
   counter += 1
   "$tmp$_" + counter
+
+  /** Helper to extract the atom from an expression.
+    *
+    * This is used to ensure that the expression is an atom and not a more
+    * complex expression.
+    */
+def extractAtom(expr: LMonVar.Expr): LMonVar.Atom = expr match
+  case AtomExpr(a) => a
+  case _           => sys.error("Expected an AtomExpr, but got: " + expr)
 
 /** Simplifies a potentially complex expression by introducing temporary
   * variables.
@@ -46,34 +57,49 @@ def freshName(): String =
   *   - a list of assignment statements computing intermediate results
   *   - the final simplified expression using only simple operands
   */
-def simplifyExpr(exp: Expr): (List[AssignStmt], Expr) = exp match
-  case Constant(n)    => (Nil, exp)
-  case Variable(name) => (Nil, exp)
+def simplifyExpr(
+    exp: LVar.Expr
+): (List[LMonVar.Stmt.AssignStmt], LMonVar.Expr) = exp match
+  case Constant(n)    => (Nil, AtomExpr(LMonVar.Atom.Constant(n)))
+  case Variable(name) => (Nil, AtomExpr(LMonVar.Atom.Variable(name)))
   case UnaryOp(op, e) =>
-    val (assignments, simpleExpr) = simplifyExpr(e)
+    val (assignments, atomExpr) = simplifyExpr(e)
     val tmp = freshName()
-    val newAssignment: AssignStmt =
-      AssignStmt(tmp, UnaryOp(op, simpleExpr))
+    val newAssignment: LMonVar.Stmt.AssignStmt =
+      LMonVar.Stmt.AssignStmt(
+        tmp,
+        LMonVar.Expr.UnaryOp(
+          op,
+          extractAtom(
+            atomExpr
+          ) // Ensure we only use the atom from the expression
+        )
+      )
     val extendedAssignments = assignments :+ newAssignment
-    (extendedAssignments, Variable(tmp))
+    (extendedAssignments, AtomExpr(LMonVar.Atom.Variable(tmp)))
   case BinaryOp(op, lhs, rhs) =>
-    val (assignmentsLeft, simpleExprLeft) = simplifyExpr(lhs)
-    val (assignmentsRight, simpleExprRight) = simplifyExpr(rhs)
+    val (assignmentsLeft, atomExprLeft) = simplifyExpr(lhs)
+    val (assignmentsRight, atomExprRight) = simplifyExpr(rhs)
     val tmp = freshName()
-    val newAssignment: AssignStmt = AssignStmt(
+    val newAssignment: LMonVar.Stmt.AssignStmt = LMonVar.Stmt.AssignStmt(
       tmp,
-      BinaryOp(op, simpleExprLeft, simpleExprRight)
+      LMonVar.Expr
+        .BinaryOp(op, extractAtom(atomExprLeft), extractAtom(atomExprRight))
     )
     val extendedAssignments =
       assignmentsLeft ++ assignmentsRight :+ newAssignment
-    (extendedAssignments, Variable(tmp))
+    (extendedAssignments, AtomExpr(LMonVar.Atom.Variable(tmp)))
   case Call(name, args) =>
     val simplified = args.map(simplifyExpr)
     val assignments = simplified.flatMap(_._1)
-    val simpleArgs = simplified.map(_._2)
+    val atomExprArgs = simplified.map(_._2)
     val tmp = freshName()
-    val newAssignment: AssignStmt = AssignStmt(tmp, Call(name, simpleArgs))
-    (assignments :+ newAssignment, Variable(tmp))
+    val newAssignment: LMonVar.Stmt.AssignStmt =
+      LMonVar.Stmt.AssignStmt(
+        tmp,
+        LMonVar.Expr.Call(name, atomExprArgs.map(extractAtom))
+      )
+    (assignments :+ newAssignment, AtomExpr(LMonVar.Atom.Variable(tmp)))
 
   /** Simplifies all expressions within a statement by extracting complex
     * subexpressions.
@@ -89,16 +115,16 @@ def simplifyExpr(exp: Expr): (List[AssignStmt], Expr) = exp match
     *   a list of simplified statements, including any generated temporary
     *   assignments
     */
-def simplifyStmt(stmt: Stmt): List[Stmt] = stmt match
+def simplifyStmt(stmt: Stmt): List[LMonVar.Stmt] = stmt match
   case ExprStmt(e) =>
-    val (assignments, simpleExpr) = simplifyExpr(e)
-    assignments :+ ExprStmt(simpleExpr)
+    val (assignments, expr) = simplifyExpr(e)
+    assignments :+ LMonVar.Stmt.ExprStmt(expr)
   case PrintStmt(e) =>
-    val (assignments, simpleExpr) = simplifyExpr(e)
-    assignments :+ PrintStmt(simpleExpr)
+    val (assignments, atomExpr) = simplifyExpr(e)
+    assignments :+ LMonVar.Stmt.PrintStmt(extractAtom(atomExpr))
   case AssignStmt(name, e) =>
-    val (assignments, simpleExpr) = simplifyExpr(e)
-    assignments :+ AssignStmt(name, simpleExpr)
+    val (assignments, expr) = simplifyExpr(e)
+    assignments :+ LMonVar.Stmt.AssignStmt(name, expr)
 
   /** Simplifies all statements in a module by flattening expressions
     * throughout.
@@ -112,9 +138,9 @@ def simplifyStmt(stmt: Stmt): List[Stmt] = stmt match
     *   a new module with all expressions simplified and lifted into flat
     *   statements
     */
-def simplifyModule(module: Module): Module =
+def simplifyModule(module: Module): LMonVar.Module =
   val simplifiedStmts = module.stmts.flatMap(simplifyStmt)
-  Module(simplifiedStmts)
+  LMonVar.Module(simplifiedStmts)
 
 def compile(input: Path): Path = {
   val basename = input.getFileName.toString.replace(".lang", "")

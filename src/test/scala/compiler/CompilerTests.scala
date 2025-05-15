@@ -6,6 +6,7 @@ import lang.SExp.*
 import lang.parse
 import compiler.LVar.*
 import compiler.LVar.Expr.*
+import compiler.LVar.BinaryOperator.*
 import compiler.LVar.Stmt.*
 import compiler.{LIntReader, LIntInterpreter}
 
@@ -239,6 +240,44 @@ class CompilerTests extends FunSuite {
       PrintStmt(BinaryOp(BinaryOperator.Sub, Constant(5), Constant(3)))
     val expected = PrintStmt(Constant(2))
     assertEquals(LIntInterpreter.partialEvalStatement(input), expected)
+  }
+
+  // ───────────────────────────────────────────────────────────────
+  // ─── LMonVar Tests ─────────────────────────────────────────────
+  // ───────────────────────────────────────────────────────────────
+
+  test("simplify to LMonVar") {
+    val expected = LMonVar.Module(
+      List(
+        LMonVar.Stmt.AssignStmt(
+          "$tmp$_1",
+          LMonVar.Expr
+            .BinaryOp(Add, LMonVar.Atom.Constant(2), LMonVar.Atom.Constant(2))
+        ),
+        LMonVar.Stmt.AssignStmt(
+          "$tmp$_2",
+          LMonVar.Expr.BinaryOp(
+            Add,
+            LMonVar.Atom.Constant(1),
+            LMonVar.Atom.Variable("$tmp$_1")
+          )
+        ),
+        LMonVar.Stmt.AssignStmt(
+          "$tmp$_3",
+          LMonVar.Expr.BinaryOp(
+            Sub,
+            LMonVar.Atom.Variable("$tmp$_2"),
+            LMonVar.Atom.Constant(8)
+          )
+        ),
+        LMonVar.Stmt.ExprStmt(
+          LMonVar.Expr.AtomExpr(LMonVar.Atom.Variable("$tmp$_3"))
+        )
+      )
+    )
+    val program = "1 + (2+2) -8"
+
+    assertEquals(simplifyModule(LVarReader.fromSExpToModule(parse(program))), expected)
   }
 
   // ───────────────────────────────────────────────────────────────
