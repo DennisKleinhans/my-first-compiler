@@ -1,9 +1,9 @@
 package compiler
 
-import compiler.AST.Expr.*
-import compiler.AST.Stmt.*
+import compiler.LVar.Expr.*
+import compiler.LVar.Stmt.*
 import scala.io.StdIn
-import compiler.AST.*
+import compiler.LVar.*
 
 /** Evaluates and partially evaluates LInt programs */
 object LIntInterpreter {

@@ -4,9 +4,9 @@ import munit.FunSuite
 import lang.SExp
 import lang.SExp.*
 import lang.parse
-import compiler.AST.*
-import compiler.AST.Expr.*
-import compiler.AST.Stmt.*
+import compiler.LVar.*
+import compiler.LVar.Expr.*
+import compiler.LVar.Stmt.*
 import compiler.{LIntReader, LIntInterpreter}
 
 class CompilerTests extends FunSuite {

@@ -2,10 +2,10 @@ package compiler
 
 import lang.SExp
 import lang.SExp.*
-import compiler.AST
-import compiler.AST.*
-import compiler.AST.Expr.*
-import compiler.AST.Stmt.*
+import compiler.LVar
+import compiler.LVar.*
+import compiler.LVar.Expr.*
+import compiler.LVar.Stmt.*
 
 /** A trait for converting S-Expressions into expressions [[Expr]], statements
   * [[Stmt]], and modules [[Module]]. This trait provides a default structure

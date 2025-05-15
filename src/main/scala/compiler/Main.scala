@@ -11,14 +11,14 @@ import x86.format
 import x86.assemble
 
 import java.nio.file.{Path, Paths}
-import AST.Stmt.*
-import AST.Expr.*
-import AST.Expr
-import AST.Module
+import LVar.Stmt.*
+import LVar.Expr.*
+import LVar.Expr
+import LVar.Module
 import scala.io.StdIn
-import AST.UnaryOperator
-import compiler.AST.BinaryOperator
-import compiler.AST.Stmt
+import LVar.UnaryOperator
+import LVar.BinaryOperator
+import LVar.Stmt
 
 @main
 def main(): Unit =
