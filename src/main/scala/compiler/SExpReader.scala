@@ -2,9 +2,6 @@ package compiler
 
 import lang.SExp
 import lang.SExp.*
-import LVar.*
-import LVar.Expr.*
-import LVar.Stmt.*
 import CommonOperators.*
 
 /** A trait for converting S-Expressions into expressions [[Expr]], statements
@@ -20,7 +17,7 @@ trait Reader {
     * @return
     *   a corresponding [[Expr]]
     */
-  def fromSExpToExpr(sexp: SExp): Expr
+  def fromSExpToExpr(sexp: SExp): LVar.Expr
 
   /** Converts an S-Expression into a corresponding [[Stmt]].
     *
@@ -29,7 +26,7 @@ trait Reader {
     * @return
     *   a corresponding [[Stmt]]
     */
-  def fromSExpToStmt(sexp: SExp): Stmt
+  def fromSExpToStmt(sexp: SExp): LVar.Stmt
 
   /** Converts an S-Expression into a full [[Module]].
     *
@@ -41,7 +38,7 @@ trait Reader {
     * @return
     *   a corresponding [[Module]]
     */
-  def fromSExpToModule(sexp: SExp): Module
+  def fromSExpToModule(sexp: SExp): LVar.Module
 }
 
 /** Parser for converting S-Expressions into [[AST]]s.
@@ -67,9 +64,9 @@ object LIntReader extends Reader {
     * @throws java.lang.RuntimeException
     *   if the expression is invalid
     */
-  def fromSExpToExpr(sexpr: SExp): Expr = sexpr match
+  def fromSExpToExpr(sexpr: SExp): LVar.Expr = sexpr match
     case Node(Symbol("Constant") :: Number(n) :: Nil) =>
-      Constant(n)
+      LVar.Constant(n)
     case Node(
           Symbol("Call") :: Node(
             Symbol("Variable") :: Symbol(name) :: Nil
@@ -78,17 +75,17 @@ object LIntReader extends Reader {
       val args = argsNode match
         case Node(elements) => elements.map(fromSExpToExpr)
         case _              => sys.error("invalid argument list: " + argsNode)
-      Call(Identifier(name), args)
+      LVar.Call(LVar.Identifier(name), args)
     case Node(Symbol("Unary") :: Symbol("Neg") :: e :: Nil) =>
-      UnaryOp(UnaryOperator.USub, fromSExpToExpr(e))
+      LVar.UnaryOp(UnaryOperator.USub, fromSExpToExpr(e))
     case Node(Symbol("Binary") :: Symbol("Add") :: lhs :: rhs :: Nil) =>
-      BinaryOp(
+      LVar.BinaryOp(
         BinaryOperator.Add,
         fromSExpToExpr(lhs),
         fromSExpToExpr(rhs)
       )
     case Node(Symbol("Binary") :: Symbol("Sub") :: lhs :: rhs :: Nil) =>
-      BinaryOp(
+      LVar.BinaryOp(
         BinaryOperator.Sub,
         fromSExpToExpr(lhs),
         fromSExpToExpr(rhs)
@@ -110,11 +107,12 @@ object LIntReader extends Reader {
     * @throws java.lang.RuntimeException
     *   if the statement is invalid
     */
-  def fromSExpToStmt(sexpr: SExp): Stmt = sexpr match
+  def fromSExpToStmt(sexpr: SExp): LVar.Stmt = sexpr match
     case Node(List(Node(Symbol("Expr") :: exprNode :: Nil))) =>
       fromSExpToExpr(exprNode) match
-        case Call(Identifier("print"), List(arg)) => PrintStmt(arg)
-        case other                                => ExprStmt(other)
+        case LVar.Call(LVar.Identifier("print"), List(arg)) =>
+          LVar.PrintStmt(arg)
+        case other => LVar.ExprStmt(other)
     case other =>
       sys.error("invalid statement: " + other)
 
@@ -130,10 +128,10 @@ object LIntReader extends Reader {
     * @throws java.lang.RuntimeException
     *   if the module structure is invalid
     */
-  def fromSExpToModule(sexpr: SExp): Module = sexpr match
+  def fromSExpToModule(sexpr: SExp): LVar.Module = sexpr match
     case Node(Symbol("Module") :: stmtSexps) =>
       val stmts = stmtSexps.map(fromSExpToStmt)
-      Module(stmts)
+      LVar.Module(stmts)
     case other =>
       sys.error("invalid module: " + other)
 }
@@ -162,9 +160,9 @@ object LVarReader extends Reader {
     * @throws java.lang.RuntimeException
     *   if the expression is invalid
     */
-  def fromSExpToExpr(sexp: SExp): Expr = sexp match
+  def fromSExpToExpr(sexp: SExp): LVar.Expr = sexp match
     case Node(Symbol("Variable") :: Symbol(name) :: Nil) =>
-      Variable(Identifier(name))
+      LVar.Variable(LVar.Identifier(name))
     case other => LIntReader.fromSExpToExpr(other)
 
     /** Converts an S-Expression into a corresponding [[Stmt]].
@@ -182,17 +180,17 @@ object LVarReader extends Reader {
       * @throws java.lang.RuntimeException
       *   if the statement is invalid
       */
-  def fromSExpToStmt(sexp: SExp): Stmt = sexp match
+  def fromSExpToStmt(sexp: SExp): LVar.Stmt = sexp match
     case Node(
           List(Node(Symbol("Assign") :: Symbol(name) :: assignExpr :: Nil))
         ) =>
-      AssignStmt(Identifier(name), fromSExpToExpr(assignExpr))
+      LVar.AssignStmt(LVar.Identifier(name), fromSExpToExpr(assignExpr))
     case other => LIntReader.fromSExpToStmt(other)
 
-  def fromSExpToModule(sexp: SExp): Module = sexp match
+  def fromSExpToModule(sexp: SExp): LVar.Module = sexp match
     case Node(Symbol("Module") :: stmtSexps) =>
       val stmts = stmtSexps.map(fromSExpToStmt)
-      Module(stmts)
+      LVar.Module(stmts)
     case other =>
       sys.error("invalid module: " + other)
 }

@@ -20,7 +20,8 @@ object CommonOperators {
   * interpretation or compilation.
   */
 object LVar {
-  import Expr.Identifier
+  export Expr.*
+  export Stmt.*
 
   /** A module is the top-level program structure in LVar.
     *
@@ -44,8 +45,8 @@ object LVar {
     case Constant(n: Long)
     case UnaryOp(op: UnaryOperator, e: Expr)
     case BinaryOp(op: BinaryOperator, left: Expr, right: Expr)
-    case Call(id: Identifier, args: List[Expr])
-    case Variable(id: Identifier)
+    case Call(id: Expr.Identifier, args: List[Expr])
+    case Variable(id: Expr.Identifier)
     case Identifier(name: String)
 
 }
@@ -56,7 +57,9 @@ object LVar {
   * interpretation or compilation.
   */
 object LMonVar {
-  import Expr.Identifier
+  export Expr.*
+  export Stmt.*
+  export Atom.*
 
   /** A module is the top-level program structure in LMonVar.
     *
@@ -80,7 +83,7 @@ object LMonVar {
   enum Expr:
     case UnaryOp(op: UnaryOperator, a: Atom)
     case BinaryOp(op: BinaryOperator, lhs: Atom, rhs: Atom)
-    case Call(id: Identifier, args: List[Atom])
+    case Call(id: Expr.Identifier, args: List[Atom])
     case AtomExpr(a: Atom)
     case Identifier(name: String)
 

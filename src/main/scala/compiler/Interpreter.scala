@@ -1,8 +1,5 @@
 package compiler
 
-import LVar.*
-import LVar.Expr.*
-import LVar.Stmt.*
 import CommonOperators.*
 import scala.io.StdIn
 
@@ -16,17 +13,17 @@ object LIntInterpreter {
     * @return
     *   the result of evaluating the expression
     */
-  def evalExpr(e: Expr): Long = e match
-    case Constant(n) => n
-    case UnaryOp(op, e) =>
+  def evalExpr(e: LVar.Expr): Long = e match
+    case LVar.Constant(n) => n
+    case LVar.UnaryOp(op, e) =>
       op match
         case UnaryOperator.USub => -evalExpr(e)
-    case BinaryOp(op, lhs, rhs) =>
+    case LVar.BinaryOp(op, lhs, rhs) =>
       op match
         case BinaryOperator.Add => evalExpr(lhs) + evalExpr(rhs)
         case BinaryOperator.Sub => evalExpr(lhs) - evalExpr(rhs)
-    case Call(Identifier("input_int"), Nil) => StdIn.readInt().toLong
-    case Call(f, _) =>
+    case LVar.Call(LVar.Identifier("input_int"), Nil) => StdIn.readInt().toLong
+    case LVar.Call(f, _) =>
       sys error s"unknown function call: $f"
     case other => sys error s"evaluation of expression $other not supported"
 
@@ -37,9 +34,9 @@ object LIntInterpreter {
     * @return
     *   the result of the evaluation (usually [[Unit]] or a [[Long]])
     */
-  def evalStatement(stmt: Stmt): Long | Unit = stmt match
-    case ExprStmt(e)  => evalExpr(e)
-    case PrintStmt(e) => println(evalExpr(e))
+  def evalStatement(stmt: LVar.Stmt): Long | Unit = stmt match
+    case LVar.ExprStmt(e)  => evalExpr(e)
+    case LVar.PrintStmt(e) => println(evalExpr(e))
     case other => sys error s"evaluation of statement $other not supported"
 
   /** Fully evaluates a module
@@ -49,8 +46,8 @@ object LIntInterpreter {
     * @return
     *   the result of the last statement or [[Unit]] if none
     */
-  def evalModule(module: Module): Long | Unit = module match
-    case Module(stmts) =>
+  def evalModule(module: LVar.Module): Long | Unit = module match
+    case LVar.Module(stmts) =>
       stmts.map(evalStatement).lastOption.getOrElse(())
 
   /** Partially evaluates an expression by constant folding
@@ -60,28 +57,28 @@ object LIntInterpreter {
     * @return
     *   a simplified [[Expr]]
     */
-  def partialEvalExpr(e: Expr): Expr = e match
-    case c @ Constant(_)                        => c
-    case i @ Call(Identifier("input_int"), Nil) => i
-    case UnaryOp(op, e) =>
+  def partialEvalExpr(e: LVar.Expr): LVar.Expr = e match
+    case c @ LVar.Constant(_)                             => c
+    case i @ LVar.Call(LVar.Identifier("input_int"), Nil) => i
+    case LVar.UnaryOp(op, e) =>
       val simplified = partialEvalExpr(e)
       op match
         case UnaryOperator.USub =>
           simplified match
-            case Constant(n) => Constant(-n)
-            case _           => UnaryOp(op, simplified)
-    case BinaryOp(op, lhs, rhs) =>
+            case LVar.Constant(n) => LVar.Constant(-n)
+            case _                => LVar.UnaryOp(op, simplified)
+    case LVar.BinaryOp(op, lhs, rhs) =>
       val left = partialEvalExpr(lhs)
       val right = partialEvalExpr(rhs)
       op match
         case BinaryOperator.Add =>
           (left, right) match
-            case (Constant(a), Constant(b)) => Constant(a + b)
-            case _                          => BinaryOp(op, left, right)
+            case (LVar.Constant(a), LVar.Constant(b)) => LVar.Constant(a + b)
+            case _ => LVar.BinaryOp(op, left, right)
         case BinaryOperator.Sub =>
           (left, right) match
-            case (Constant(a), Constant(b)) => Constant(a - b)
-            case _                          => BinaryOp(op, left, right)
+            case (LVar.Constant(a), LVar.Constant(b)) => LVar.Constant(a - b)
+            case _ => LVar.BinaryOp(op, left, right)
     case other => other
 
   /** Partially evaluates a statement by simplifying contained expressions
@@ -91,9 +88,9 @@ object LIntInterpreter {
     * @return
     *   a simplified [[Stmt]]
     */
-  def partialEvalStatement(stmt: Stmt): Stmt = stmt match
-    case ExprStmt(e)  => ExprStmt(partialEvalExpr(e))
-    case PrintStmt(e) => PrintStmt(partialEvalExpr(e))
+  def partialEvalStatement(stmt: LVar.Stmt): LVar.Stmt = stmt match
+    case LVar.ExprStmt(e)  => LVar.ExprStmt(partialEvalExpr(e))
+    case LVar.PrintStmt(e) => LVar.PrintStmt(partialEvalExpr(e))
     case other => sys error s"evaluation of statement $other not supported"
 
   /** Partially evaluates all statements in a module
@@ -103,7 +100,7 @@ object LIntInterpreter {
     * @return
     *   a simplified [[Module]]
     */
-  def partialEvalModule(module: Module): Module = module match
-    case Module(stmts) =>
-      Module(stmts.map(partialEvalStatement))
+  def partialEvalModule(module: LVar.Module): LVar.Module = module match
+    case LVar.Module(stmts) =>
+      LVar.Module(stmts.map(partialEvalStatement))
 }
