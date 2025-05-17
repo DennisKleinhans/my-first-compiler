@@ -2,6 +2,19 @@ package compiler
 
 import CommonNodes.*
 import LMonVar.Expr.AtomExpr
+import LMonVar.Atom
+
+/** Converts an LMonVar atom to an x86Var argument.
+  *
+  * @param atom
+  *   the LMonVar atom to convert
+  * @return
+  *   the corresponding x86Var argument either as an immediate value or a
+  *   variable
+  */
+def argFromAtom(atom: LMonVar.Atom): x86Var.Arg = atom match
+  case Atom.Constant(n)  => x86Var.Immediate(n)
+  case Atom.Variable(id) => x86Var.Variable(id)
 
 /** Translates an entire LMonVar module into a flat list of x86 instructions.
   *
