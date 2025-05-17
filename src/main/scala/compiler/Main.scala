@@ -3,21 +3,12 @@ package compiler
 import lang.SExp
 import lang.SExp.*
 import lang.parse
-import x86.Instr.*
-import x86.Arg.*
-import x86.Reg.*
 import x86.Program
 import x86.format
 import x86.assemble
 
 import java.nio.file.{Path, Paths}
 import scala.io.StdIn
-import LMonVar.AtomExpr
-import CommonNodes.*
-import compiler.LMonVar.Expr
-import compiler.LMonVar.Atom
-import compiler.x86Var.Arg
-import compiler.LVarReader.fromSExpToModule
 
 @main
 def main(): Unit =
@@ -32,8 +23,8 @@ def compile(input: Path): Path = {
 }
 
 def replaceMeWithTheActualCompilation(prog: SExp): Program = {
-  val progOut = fromSExpToModule(prog)
-  val progOut2 = simplifyModule(progOut)
+  val progOut = LVarReader.fromSExpToModule(prog)
+  val progOut2 = simplifyModule(progOut, NameGenerator())
   val progOut3 = selectInstructions(progOut2)
   val progOut4 = assignHomes(progOut3)
   val prelude = List(

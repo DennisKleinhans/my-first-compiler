@@ -7,8 +7,12 @@ import lang.parse
 import compiler.CommonNodes.*
 
 import compiler.{LIntReader, LIntInterpreter}
+import munit.Tag
+import java.util.jar.Attributes.Name
 
 class CompilerTests extends FunSuite {
+  override def munitTests(): List[Test] =
+    super.munitTests().map(_.withTags(Set(Tag("sequential")))).toList
 
   // ───────────────────────────────────────────────────────────────
   // ─── Basic Sanity Check ────────────────────────────────────────
@@ -257,6 +261,12 @@ class CompilerTests extends FunSuite {
   // ───────────────────────────────────────────────────────────────
 
   test("simplify to LMonVar") {
+    val program = "1 + (2+2) -8"
+    val result = simplifyModule(
+      LVarReader.fromSExpToModule(parse(program)),
+      NameGenerator()
+    )
+
     val expected = LMonVar.Module(
       List(
         LMonVar.AssignStmt(
@@ -290,12 +300,74 @@ class CompilerTests extends FunSuite {
         )
       )
     )
-    val program = "1 + (2+2) -8"
 
-    assertEquals(
-      simplifyModule(LVarReader.fromSExpToModule(parse(program))),
-      expected
+    assertEquals(result, expected)
+  }
+
+  // ───────────────────────────────────────────────────────────────
+  // ─── selectInstructions Tests───────────────────────────────────
+  // ───────────────────────────────────────────────────────────────
+
+  test("selectInstructions - simple Add (1+2)") {
+    val programm = "1+2"
+    val result = selectInstructions(
+      simplifyModule(
+        LVarReader.fromSExpToModule((parse(programm))),
+        NameGenerator()
+      )
     )
+    val expected = List(
+      x86Var.MovQ(x86Var.Immediate(1), x86Var.Variable(Identifier("$tmp$_1"))),
+      x86Var.AddQ(x86Var.Immediate(2), x86Var.Variable(Identifier("$tmp$_1")))
+    )
+    assertEquals(result, expected)
+  }
+
+  test("selectInstructions - read_int()") {
+    val programm = "1 + read_int()"
+    val result = selectInstructions(
+      simplifyModule(
+        LVarReader.fromSExpToModule((parse(programm))),
+        NameGenerator()
+      )
+    )
+    val expected = List(
+      x86Var.CallQ("read_int", 0),
+      x86Var.MovQ(
+        x86Var.Register(x86.Reg.Rax),
+        x86Var.Variable(Identifier("$tmp$_1"))
+      ),
+      x86Var.MovQ(x86Var.Immediate(1), x86Var.Variable(Identifier("$tmp$_2"))),
+      x86Var.AddQ(
+        x86Var.Variable(Identifier("$tmp$_1")),
+        x86Var.Variable(Identifier("$tmp$_2"))
+      )
+    )
+  }
+
+  test("selectInstructions - complex arithmetic ()") {
+    val programm = "1+(3+4)-8"
+    val expected = List(
+      x86Var.MovQ(x86Var.Immediate(3), x86Var.Variable(Identifier("$tmp$_1"))),
+      x86Var.AddQ(x86Var.Immediate(4), x86Var.Variable(Identifier("$tmp$_1"))),
+      x86Var.MovQ(x86Var.Immediate(1), x86Var.Variable(Identifier("$tmp$_2"))),
+      x86Var.AddQ(
+        x86Var.Variable(Identifier("$tmp$_1")),
+        x86Var.Variable(Identifier("$tmp$_2"))
+      ),
+      x86Var.MovQ(
+        x86Var.Variable(Identifier("$tmp$_2")),
+        x86Var.Variable(Identifier("$tmp$_3"))
+      ),
+      x86Var.SubQ(x86Var.Immediate(8), x86Var.Variable(Identifier("$tmp$_3")))
+    )
+    val result = selectInstructions(
+      simplifyModule(
+        LVarReader.fromSExpToModule(parse(programm)),
+        NameGenerator()
+      )
+    )
+    assertEquals(result, expected)
   }
 
   // ───────────────────────────────────────────────────────────────
