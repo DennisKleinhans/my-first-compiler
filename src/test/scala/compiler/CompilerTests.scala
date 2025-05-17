@@ -4,7 +4,7 @@ import munit.FunSuite
 import lang.SExp
 import lang.SExp.*
 import lang.parse
-import compiler.CommonOperators.*
+import compiler.CommonNodes.*
 
 import compiler.{LIntReader, LIntInterpreter}
 
@@ -89,7 +89,7 @@ class CompilerTests extends FunSuite {
   testReadExpression(
     "call: input_int",
     sexpInputIntCall,
-    LVar.Call(LVar.Identifier("input_int"), Nil)
+    LVar.Call(Identifier("input_int"), Nil)
   )
 
   test("LIntReader.readStatement - ExprStmt") {
@@ -122,7 +122,7 @@ class CompilerTests extends FunSuite {
   test("LVarReader.fromSExpToExpr") {
     assertEquals(
       LVarReader.fromSExpToExpr(Node(List(Symbol("Variable"), Symbol("x")))),
-      LVar.Variable(LVar.Identifier("x"))
+      LVar.Variable(Identifier("x"))
     )
   }
 
@@ -141,7 +141,7 @@ class CompilerTests extends FunSuite {
           )
         )
       ),
-      LVar.AssignStmt(LVar.Identifier("x"), LVar.Constant(1))
+      LVar.AssignStmt(Identifier("x"), LVar.Constant(1))
     )
   }
 
@@ -165,7 +165,7 @@ class CompilerTests extends FunSuite {
           )
         )
       ),
-      LVar.Module(List(LVar.AssignStmt(LVar.Identifier("x"), LVar.Constant(1))))
+      LVar.Module(List(LVar.AssignStmt(Identifier("x"), LVar.Constant(1))))
     )
   }
 
@@ -232,13 +232,13 @@ class CompilerTests extends FunSuite {
     val input = LVar.BinaryOp(
       BinaryOperator.Add,
       LVar.BinaryOp(BinaryOperator.Add, LVar.Constant(1), LVar.Constant(2)),
-      LVar.Call(LVar.Identifier("input_int"), List.empty)
+      LVar.Call(Identifier("input_int"), List.empty)
     )
     val expected =
       LVar.BinaryOp(
         BinaryOperator.Add,
         LVar.Constant(3),
-        LVar.Call(LVar.Identifier("input_int"), List.empty)
+        LVar.Call(Identifier("input_int"), List.empty)
       )
     assertEquals(LIntInterpreter.partialEvalExpr(input), expected)
   }
@@ -260,7 +260,7 @@ class CompilerTests extends FunSuite {
     val expected = LMonVar.Module(
       List(
         LMonVar.AssignStmt(
-          LMonVar.Identifier("$tmp$_1"),
+          Identifier("$tmp$_1"),
           LMonVar.BinaryOp(
             BinaryOperator.Add,
             LMonVar.Constant(2),
@@ -268,24 +268,24 @@ class CompilerTests extends FunSuite {
           )
         ),
         LMonVar.AssignStmt(
-          LMonVar.Identifier("$tmp$_2"),
+          Identifier("$tmp$_2"),
           LMonVar.BinaryOp(
             BinaryOperator.Add,
             LMonVar.Constant(1),
-            LMonVar.Variable(LMonVar.Identifier("$tmp$_1"))
+            LMonVar.Variable(Identifier("$tmp$_1"))
           )
         ),
         LMonVar.AssignStmt(
-          LMonVar.Identifier("$tmp$_3"),
+          Identifier("$tmp$_3"),
           LMonVar.BinaryOp(
             BinaryOperator.Sub,
-            LMonVar.Variable(LMonVar.Identifier("$tmp$_2")),
+            LMonVar.Variable(Identifier("$tmp$_2")),
             LMonVar.Constant(8)
           )
         ),
         LMonVar.ExprStmt(
           LMonVar.AtomExpr(
-            LMonVar.Variable(LMonVar.Identifier("$tmp$_3"))
+            LMonVar.Variable(Identifier("$tmp$_3"))
           )
         )
       )

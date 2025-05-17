@@ -1,6 +1,6 @@
 package compiler
 
-import CommonOperators.*
+import CommonNodes.*
 import scala.io.StdIn
 
 /** Evaluates and partially evaluates LInt programs */
@@ -22,7 +22,7 @@ object LIntInterpreter {
       op match
         case BinaryOperator.Add => evalExpr(lhs) + evalExpr(rhs)
         case BinaryOperator.Sub => evalExpr(lhs) - evalExpr(rhs)
-    case LVar.Call(LVar.Identifier("input_int"), Nil) => StdIn.readInt().toLong
+    case LVar.Call(Identifier("input_int"), Nil) => StdIn.readInt().toLong
     case LVar.Call(f, _) =>
       sys error s"unknown function call: $f"
     case other => sys error s"evaluation of expression $other not supported"
@@ -58,8 +58,8 @@ object LIntInterpreter {
     *   a simplified [[Expr]]
     */
   def partialEvalExpr(e: LVar.Expr): LVar.Expr = e match
-    case c @ LVar.Constant(_)                             => c
-    case i @ LVar.Call(LVar.Identifier("input_int"), Nil) => i
+    case c @ LVar.Constant(_)                        => c
+    case i @ LVar.Call(Identifier("input_int"), Nil) => i
     case LVar.UnaryOp(op, e) =>
       val simplified = partialEvalExpr(e)
       op match

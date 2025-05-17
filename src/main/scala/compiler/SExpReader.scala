@@ -2,7 +2,7 @@ package compiler
 
 import lang.SExp
 import lang.SExp.*
-import CommonOperators.*
+import CommonNodes.*
 
 /** A trait for converting S-Expressions into expressions [[Expr]], statements
   * [[Stmt]], and modules [[Module]]. This trait provides a default structure
@@ -75,7 +75,7 @@ object LIntReader extends Reader {
       val args = argsNode match
         case Node(elements) => elements.map(fromSExpToExpr)
         case _              => sys.error("invalid argument list: " + argsNode)
-      LVar.Call(LVar.Identifier(name), args)
+      LVar.Call(Identifier(name), args)
     case Node(Symbol("Unary") :: Symbol("Neg") :: e :: Nil) =>
       LVar.UnaryOp(UnaryOperator.USub, fromSExpToExpr(e))
     case Node(Symbol("Binary") :: Symbol("Add") :: lhs :: rhs :: Nil) =>
@@ -110,7 +110,7 @@ object LIntReader extends Reader {
   def fromSExpToStmt(sexpr: SExp): LVar.Stmt = sexpr match
     case Node(List(Node(Symbol("Expr") :: exprNode :: Nil))) =>
       fromSExpToExpr(exprNode) match
-        case LVar.Call(LVar.Identifier("print"), List(arg)) =>
+        case LVar.Call(Identifier("print"), List(arg)) =>
           LVar.PrintStmt(arg)
         case other => LVar.ExprStmt(other)
     case other =>
@@ -162,7 +162,7 @@ object LVarReader extends Reader {
     */
   def fromSExpToExpr(sexp: SExp): LVar.Expr = sexp match
     case Node(Symbol("Variable") :: Symbol(name) :: Nil) =>
-      LVar.Variable(LVar.Identifier(name))
+      LVar.Variable(Identifier(name))
     case other => LIntReader.fromSExpToExpr(other)
 
     /** Converts an S-Expression into a corresponding [[Stmt]].
@@ -184,7 +184,7 @@ object LVarReader extends Reader {
     case Node(
           List(Node(Symbol("Assign") :: Symbol(name) :: assignExpr :: Nil))
         ) =>
-      LVar.AssignStmt(LVar.Identifier(name), fromSExpToExpr(assignExpr))
+      LVar.AssignStmt(Identifier(name), fromSExpToExpr(assignExpr))
     case other => LIntReader.fromSExpToStmt(other)
 
   def fromSExpToModule(sexp: SExp): LVar.Module = sexp match

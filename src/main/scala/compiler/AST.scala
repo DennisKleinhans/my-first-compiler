@@ -1,8 +1,9 @@
 package compiler
 
-import compiler.CommonOperators.*
+import compiler.CommonNodes.*
+import compiler.LMonVar.Atom
 
-object CommonOperators {
+object CommonNodes {
 
   /** A unary operator represents an operation with a single operand. */
   enum UnaryOperator:
@@ -12,6 +13,8 @@ object CommonOperators {
   enum BinaryOperator:
     case Add
     case Sub
+
+  case class Identifier(name: String)
 }
 
 /** The abstract syntax tree (AST) for the LVar language.
@@ -45,9 +48,8 @@ object LVar {
     case Constant(n: Long)
     case UnaryOp(op: UnaryOperator, e: Expr)
     case BinaryOp(op: BinaryOperator, left: Expr, right: Expr)
-    case Call(id: Expr.Identifier, args: List[Expr])
-    case Variable(id: Expr.Identifier)
-    case Identifier(name: String)
+    case Call(id: Identifier, args: List[Expr])
+    case Variable(id: Identifier)
 
 }
 
@@ -83,9 +85,8 @@ object LMonVar {
   enum Expr:
     case UnaryOp(op: UnaryOperator, a: Atom)
     case BinaryOp(op: BinaryOperator, lhs: Atom, rhs: Atom)
-    case Call(id: Expr.Identifier, args: List[Atom])
+    case Call(id: Identifier, args: List[Atom])
     case AtomExpr(a: Atom)
-    case Identifier(name: String)
 
   /** An atom in LMonVar can be a constant value or a variable reference. */
   enum Atom:
