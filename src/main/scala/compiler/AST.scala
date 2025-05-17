@@ -93,3 +93,31 @@ object LMonVar {
     case Constant(n: Long)
     case Variable(id: Identifier)
 }
+
+/** The x86Var intermediate representation (IR) for the LMonVar language.
+  *
+  * Represents the structure of LMonVar programs after instruction selection and
+  * before final assembly generation.
+  */
+object x86Var {
+  export Arg.*
+  export Instr.*
+
+  /** An argument in x86Var can be an immediate value, a variable reference, or
+    * a register.
+    */
+  enum Arg:
+    case Immediate(n: Long)
+    case Variable(id: Identifier)
+    case Register(reg: x86.Reg)
+
+  /** An instruction in x86Var represents a single operation in the x86
+    * architecture. It can be a move, arithmetic operation, or a function call.
+    */
+  enum Instr:
+    case MovQ(src: Arg, dest: Arg)
+    case AddQ(src: Arg, dest: Arg)
+    case SubQ(src: Arg, dest: Arg)
+    case NegQ(arg: Arg)
+    case CallQ(label: String, arity: Int)
+}
