@@ -72,6 +72,7 @@ object LIntReader extends Reader {
             Symbol("Variable") :: Symbol(name) :: Nil
           ) :: argsNode :: Nil
         ) =>
+      if (name == "print_int") sys error "print is not a valid expression"
       val args = argsNode match
         case Node(elements) => elements.map(fromSExpToExpr)
         case _              => sys.error("invalid argument list: " + argsNode)
