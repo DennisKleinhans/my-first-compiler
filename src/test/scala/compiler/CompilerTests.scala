@@ -6,13 +6,11 @@ import lang.SExp.*
 import lang.parse
 import compiler.CommonNodes.*
 
-import compiler.{LIntReader, LIntInterpreter}
+import compiler.{LIntInterpreter}
 import munit.Tag
 import java.util.jar.Attributes.Name
 
 class CompilerTests extends FunSuite {
-  override def munitTests(): List[Test] =
-    super.munitTests().map(_.withTags(Set(Tag("sequential")))).toList
 
   // ───────────────────────────────────────────────────────────────
   // ─── Basic Sanity Check ────────────────────────────────────────
@@ -55,7 +53,7 @@ class CompilerTests extends FunSuite {
     List(
       Symbol("Call"),
       Node(List(Symbol("Variable"), Symbol("input_int"))),
-      Node(List())
+      Node(Nil)
     )
   )
 
@@ -63,7 +61,7 @@ class CompilerTests extends FunSuite {
     LVar.BinaryOp(BinaryOperator.Add, LVar.Constant(1), LVar.Constant(1))
 
   // ───────────────────────────────────────────────────────────────
-  // ─── LIntReader Tests ──────────────────────────────────────────
+  // ─── Expression Tests ─────────────────────────────────────────
   // ───────────────────────────────────────────────────────────────
 
   def testReadExpression(
@@ -71,105 +69,92 @@ class CompilerTests extends FunSuite {
       input: SExp,
       expected: LVar.Expr
   ): Unit = {
-    test(s"LIntReader.fromSExpToExpr - $name") {
-      assertEquals(LIntReader.fromSExpToExpr(input), expected)
+    test(s"fromSExpToExpr - $name") {
+      assertEquals(LVarReader.fromSExpToExpr(input), expected)
     }
   }
 
   testReadExpression("binary: 1 + 1", sexpOnePlusOne, onePlusOneAst)
-
   testReadExpression(
     "binary: 4 - 2",
     sexpFourMinusTwo,
     LVar.BinaryOp(BinaryOperator.Sub, LVar.Constant(4), LVar.Constant(2))
   )
-
   testReadExpression(
     "unary: -8",
     sexpMinusEight,
     LVar.UnaryOp(UnaryOperator.USub, LVar.Constant(8))
   )
-
   testReadExpression(
     "call: input_int",
     sexpInputIntCall,
     LVar.Call(Identifier("input_int"), Nil)
   )
 
-  test("LIntReader.readStatement - ExprStmt") {
+  // ───────────────────────────────────────────────────────────────
+  // ─── Statement Tests ──────────────────────────────────────────
+  // ───────────────────────────────────────────────────────────────
+
+  test("fromSExpToStmt - ExprStmt") {
+    val sexp = Node(
+      List(
+        Symbol("Expr"),
+        sexpOnePlusOne
+      )
+    )
     assertEquals(
-      LIntReader.fromSExpToStmt(
-        Node(List(Node(List(Symbol("Expr"), sexpOnePlusOne))))
-      ),
+      LVarReader.fromSExpToStmt(sexp),
       LVar.ExprStmt(onePlusOneAst)
     )
   }
 
-  test("LIntReader.readModule - single print expr") {
+  test("fromSExpToStmt - AssignStmt") {
+    val sexp = Node(
+      List(
+        Symbol("Assign"),
+        Symbol("x"),
+        Node(List(Symbol("Constant"), Number(5)))
+      )
+    )
     assertEquals(
-      LIntReader.fromSExpToModule(
-        Node(
-          List(
-            Symbol("Module"),
-            Node(List(Node(List(Symbol("Expr"), sexpOnePlusOne))))
-          )
-        )
-      ),
-      LVar.Module(List(LVar.ExprStmt(onePlusOneAst)))
+      LVarReader.fromSExpToStmt(sexp),
+      LVar.AssignStmt(Identifier("x"), LVar.Constant(5))
     )
   }
 
-  // ───────────────────────────────────────────────────────────────
-  // ─── LVarReader Tests ──────────────────────────────────────────
-  // ───────────────────────────────────────────────────────────────
-
-  test("LVarReader.fromSExpToExpr") {
-    assertEquals(
-      LVarReader.fromSExpToExpr(Node(List(Symbol("Variable"), Symbol("x")))),
-      LVar.Variable(Identifier("x"))
-    )
-  }
-
-  test("LVarReader.fromSExpToStmt") {
-    assertEquals(
-      LVarReader.fromSExpToStmt(
+  test("fromSExpToStmt - PrintStmt") {
+    val sexp = Node(
+      List(
+        Symbol("Expr"),
         Node(
           List(
-            Node(
-              List(
-                Symbol("Assign"),
-                Symbol("x"),
-                Node(List(Symbol("Constant"), Number(1)))
-              )
-            )
-          )
-        )
-      ),
-      LVar.AssignStmt(Identifier("x"), LVar.Constant(1))
-    )
-  }
-
-  test("LVarReader.fromSExptoModule") {
-    assertEquals(
-      LVarReader.fromSExpToModule(
-        Node(
-          List(
-            Symbol("Module"),
+            Symbol("Call"),
+            Node(List(Symbol("Variable"), Symbol("print"))),
             Node(
               List(
                 Node(
                   List(
-                    Symbol("Assign"),
-                    Symbol("x"),
-                    Node(List(Symbol("Constant"), Number(1)))
+                    Symbol("Binary"),
+                    Symbol("Add"),
+                    Node(List(Symbol("Variable"), Symbol("x"))),
+                    Node(List(Symbol("Constant"), Number(2)))
                   )
                 )
               )
             )
           )
         )
-      ),
-      LVar.Module(List(LVar.AssignStmt(Identifier("x"), LVar.Constant(1))))
+      )
+    )
+    assertEquals(
+      LVarReader.fromSExpToStmt(sexp),
+      LVar.PrintStmt(
+        LVar.BinaryOp(
+          BinaryOperator.Add,
+          LVar.Variable(Identifier("x")),
+          LVar.Constant(2)
+        )
+      )
     )
   }
 
@@ -179,21 +164,21 @@ class CompilerTests extends FunSuite {
 
   test("LIntInterpreter.evalExpr - binary: 1 + 1") {
     assertEquals(
-      LIntInterpreter.evalExpr(LIntReader.fromSExpToExpr(sexpOnePlusOne)),
+      LIntInterpreter.evalExpr(LVarReader.fromSExpToExpr(sexpOnePlusOne)),
       2L
     )
   }
 
   test("LIntInterpreter.evalExpr - binary: 4 - 2") {
     assertEquals(
-      LIntInterpreter.evalExpr(LIntReader.fromSExpToExpr(sexpFourMinusTwo)),
+      LIntInterpreter.evalExpr(LVarReader.fromSExpToExpr(sexpFourMinusTwo)),
       2L
     )
   }
 
   test("LIntInterpreter.evalExpr - unary: -8") {
     assertEquals(
-      LIntInterpreter.evalExpr(LIntReader.fromSExpToExpr(sexpMinusEight)),
+      LIntInterpreter.evalExpr(LVarReader.fromSExpToExpr(sexpMinusEight)),
       -8L
     )
   }
@@ -204,7 +189,7 @@ class CompilerTests extends FunSuite {
 
     val outputStream = new java.io.ByteArrayOutputStream()
     Console.withOut(outputStream) {
-      LIntInterpreter.evalModule(LIntReader.fromSExpToModule(parse(input)))
+      LIntInterpreter.evalModule(LVarReader.fromSExpToModule(parse(input)))
     }
 
     val actualOutput = outputStream.toString
@@ -263,8 +248,7 @@ class CompilerTests extends FunSuite {
   test("simplify to LMonVar") {
     val program = "1 + (2+2) -8"
     val result = simplifyModule(
-      LVarReader.fromSExpToModule(parse(program)),
-      NameGenerator()
+      LVarReader.fromSExpToModule(parse(program))
     )
 
     val expected = LMonVar.Module(
@@ -312,8 +296,7 @@ class CompilerTests extends FunSuite {
     val programm = "1+2"
     val result = selectInstructions(
       simplifyModule(
-        LVarReader.fromSExpToModule((parse(programm))),
-        NameGenerator()
+        LVarReader.fromSExpToModule((parse(programm)))
       )
     )
     val expected = List(
@@ -327,8 +310,7 @@ class CompilerTests extends FunSuite {
     val programm = "1 + read_int()"
     val result = selectInstructions(
       simplifyModule(
-        LVarReader.fromSExpToModule((parse(programm))),
-        NameGenerator()
+        LVarReader.fromSExpToModule((parse(programm)))
       )
     )
     val expected = List(
@@ -363,8 +345,7 @@ class CompilerTests extends FunSuite {
     )
     val result = selectInstructions(
       simplifyModule(
-        LVarReader.fromSExpToModule(parse(programm)),
-        NameGenerator()
+        LVarReader.fromSExpToModule(parse(programm))
       )
     )
     assertEquals(result, expected)
@@ -384,13 +365,13 @@ class CompilerTests extends FunSuite {
         )
       )
     )
-    assertEquals(LIntReader.fromSExpToModule(parse(printCall)), expected)
+    assertEquals(LVarReader.fromSExpToModule(parse(printCall)), expected)
   }
 
   test("End-to-End: object language -> eval result") {
     val program = "1 + (4 - 2) - (-8)"
     assertEquals(
-      LIntInterpreter.evalModule(LIntReader.fromSExpToModule(parse(program))),
+      LIntInterpreter.evalModule(LVarReader.fromSExpToModule(parse(program))),
       11L
     )
   }

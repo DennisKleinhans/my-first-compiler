@@ -45,7 +45,7 @@ def extractAtom(expr: LMonVar.Expr): LMonVar.Atom = expr match
   */
 def simplifyExpr(
     exp: LVar.Expr,
-    gen: NameGenerator
+    gen: NameGenerator = NameGenerator()
 ): (List[LMonVar.AssignStmt], LMonVar.Expr) = exp match
   case LVar.Constant(n) => (Nil, Expr.AtomExpr(LMonVar.Constant(n)))
   case LVar.Variable(Identifier(name)) =>
@@ -118,7 +118,7 @@ def simplifyExpr(
     *   a list of simplified statements, including any generated temporary
     *   assignments
     */
-def simplifyStmt(stmt: LVar.Stmt, gen: NameGenerator): List[LMonVar.Stmt] =
+def simplifyStmt(stmt: LVar.Stmt, gen: NameGenerator = NameGenerator()): List[LMonVar.Stmt] =
   stmt match
     case LVar.ExprStmt(e) =>
       val (assignments, expr) = simplifyExpr(e, gen)
@@ -142,6 +142,6 @@ def simplifyStmt(stmt: LVar.Stmt, gen: NameGenerator): List[LMonVar.Stmt] =
       *   a new module with all expressions simplified and lifted into flat
       *   statements
       */
-def simplifyModule(module: LVar.Module, gen: NameGenerator): LMonVar.Module =
+def simplifyModule(module: LVar.Module, gen: NameGenerator = NameGenerator()): LMonVar.Module =
   val simplifiedStmts = module.stmts.flatMap(simplifyStmt(_, gen))
   LMonVar.Module(simplifiedStmts)

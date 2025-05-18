@@ -18,9 +18,9 @@ def patchInstructions(instrs: List[x86.Instr]): List[x86.Instr] =
     case MovQ(src @ Deref(_, _), dest @ Deref(_, _)) =>
       List(MovQ(src, Register(Rax)), MovQ(Register(Rax), dest))
     case AddQ(src @ Deref(_, _), dest @ Deref(_, _)) =>
-      List(MovQ(src, Register(Rax)), MovQ(Register(Rax), dest))
+      List(MovQ(src, Register(Rax)), AddQ(Register(Rax), dest))
     case SubQ(src @ Deref(_, _), dest @ Deref(_, _)) =>
-      List(MovQ(src, Register(Rax)), MovQ(Register(Rax), dest))
+      List(MovQ(src, Register(Rax)), SubQ(Register(Rax), dest))
     case NegQ(arg @ Deref(_, _)) =>
       List(
         MovQ(arg, Register(Rax)),

@@ -14,7 +14,7 @@ import CommonNodes.Identifier
   * @return
   *   A list of concrete x86 instructions with resolved memory locations.
   */
-def assignHomes(instrs: List[x86Var.Instr]): List[x86.Instr] = {
+def assignHomes(instrs: List[x86Var.Instr]): (List[x86.Instr], Int) = {
   type Locations = Map[Identifier, Int]
 
   /** Translates an abstract argument into a concrete one, allocating a new
@@ -107,13 +107,13 @@ def assignHomes(instrs: List[x86Var.Instr]): List[x86.Instr] = {
   }
 
   // Initial values: empty instruction list, empty locations map, and offset starting at -8
-  val (finalInstrs, _, _) =
+  val (finalInstrs, _, finalOffset) =
     instrs.foldLeft((List.empty[x86.Instr], Map.empty[Identifier, Int], -8)) {
       case ((translatedInstrs, currentLocations, currentOffset), instr) =>
         val (translatedInstr, updatedLocations, updatedOffset) =
           assignInstr(instr, currentLocations, currentOffset)
         (translatedInstrs :+ translatedInstr, updatedLocations, updatedOffset)
     }
-
-  finalInstrs
+  val stackSpace = -finalOffset 
+  (finalInstrs, stackSpace)
 }
