@@ -3,22 +3,43 @@ package x86
 case class Program(blocks: Map[String, List[Instr]])
 
 enum Instr {
-  case AddQ(src: Arg, dest: Arg)
-  case SubQ(src: Arg, dest: Arg)
-  case MovQ(src: Arg, dest: Arg)
-  case NegQ(arg: Arg)
+  case AddQ(src: Arg, dest: Location)
+  case SubQ(src: Arg, dest: Location)
+  case NegQ(arg: Location)
+  case IMulQ(src: Arg, dest: Location)
+  case MovQ(src: Arg, dest: Location)
   case PushQ(arg: Arg)
   case PopQ(arg: Arg)
   case CallQ(label: String, arity: Int)
+  case IndCallQ(arg: Arg, arity: Int)
   case RetQ
+  case XorQ(src: Arg, dest: Location)
+  case CmpQ(lower: Arg, higher: Arg)
+  case MovZBQ(src: Arg, dest: Location)
+  case LeaQ(arg: Arg, reg: Reg)
   case Jmp(label: String)
+  case JmpIf(cc: Cc, label: String)
+  case Set(cc: Cc, dest: Location)
+  case TailJmp(arg: Arg, arity: Int)
+  case AndQ(src: Arg, dest: Location)
+  case SarQ(src: Arg, dest: Location)
 }
 
-enum Arg {
-  case Immediate(int: Long)
-  case Register(reg: Reg)
-  case Deref(reg: Reg, offset: Long)
+enum Cc {
+  case E
+  case NE
+  case L
+  case Le
+  case G
+  case Ge
 }
+
+case class Immediate(int: Long)
+case class Deref(reg: Reg, offset: Long)
+case class Global(label: String)
+
+type Location = Reg | Deref | Global | ByteReg
+type Arg = Location | Immediate
 
 enum Reg {
 
@@ -102,3 +123,15 @@ enum Reg {
    */
   case R15
 }
+
+enum ByteReg {
+  case Ah
+  case Al
+  case Bh
+  case Bl
+  case Ch
+  case Cl
+  case Dh
+  case Dl
+}
+
