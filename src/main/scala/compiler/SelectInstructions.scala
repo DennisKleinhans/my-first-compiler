@@ -1,8 +1,7 @@
 package compiler
 
 import CommonNodes.*
-import LMonVar.Expr.AtomExpr
-import LMonVar.Atom
+import LMonIf.Expr.AtomExpr
 
 /** Converts an LMonVar atom to an x86Var argument.
   *
@@ -12,9 +11,9 @@ import LMonVar.Atom
   *   the corresponding x86Var argument either as an immediate value or a
   *   variable
   */
-def argFromAtom(atom: LMonVar.Atom): x86Var.Arg = atom match
-  case Atom.Constant(n)  => x86Var.Immediate(n)
-  case Atom.Variable(id) => x86Var.Variable(id)
+def argFromAtom(atom: Atom): x86VarIf.Arg = atom match
+  case Atom.Constant(n)  => x86VarIf.Immediate(n)
+  case Atom.Variable(id) => x86VarIf.Variable(id)
 
 /** Translates an entire LMonVar module into a flat list of x86 instructions.
   *
@@ -26,7 +25,7 @@ def argFromAtom(atom: LMonVar.Atom): x86Var.Arg = atom match
   * @return
   *   a list of x86 instructions representing the module
   */
-def selectInstructions(module: LMonVar.Module): List[x86Var.Instr] =
+def selectInstructions(module: LMonIf.Module): List[x86VarIf.Instr] =
   module.stmts.flatMap(selectInstructions)
 
 /** Translates a single LMonVar statement into a list of x86 instructions.
@@ -47,50 +46,50 @@ def selectInstructions(module: LMonVar.Module): List[x86Var.Instr] =
   * @return
   *   a list of x86 instructions implementing the statement
   */
-def selectInstructions(stmt: LMonVar.Stmt): List[x86Var.Instr] = stmt match
-  case LMonVar.AssignStmt(id, expr) =>
+def selectInstructions(stmt: LMonIf.Stmt): List[x86VarIf.Instr] = stmt match
+  case LMonIf.AssignStmt(id, expr) =>
     expr match
       case AtomExpr(atom) =>
-        List(x86Var.MovQ(argFromAtom(atom), x86Var.Variable(id)))
-      case LMonVar.UnaryOp(op, atom) =>
+        List(x86VarIf.MovQ(argFromAtom(atom), x86VarIf.Variable(id)))
+      case LMonIf.UnaryNumericOp(op, atom) =>
         op match
-          case UnaryOperator.USub =>
+          case UnaryNumericOperator.USub =>
             List(
-              x86Var.MovQ(argFromAtom(atom), x86Var.Variable(id)),
-              x86Var.NegQ(x86Var.Variable(id))
+              x86VarIf.MovQ(argFromAtom(atom), x86VarIf.Variable(id)),
+              x86VarIf.NegQ(x86VarIf.Variable(id))
             )
-      case LMonVar.BinaryOp(op, leftAtom, rightAtom) =>
+      case LMonIf.BinaryNumericOp(op, leftAtom, rightAtom) =>
         op match
-          case BinaryOperator.Add =>
+          case BinaryNumericOperator.Add =>
             List(
-              x86Var.MovQ(argFromAtom(leftAtom), x86Var.Variable(id)),
-              x86Var.AddQ(argFromAtom(rightAtom), x86Var.Variable(id))
+              x86VarIf.MovQ(argFromAtom(leftAtom), x86VarIf.Variable(id)),
+              x86VarIf.AddQ(argFromAtom(rightAtom), x86VarIf.Variable(id))
             )
-          case BinaryOperator.Sub =>
+          case BinaryNumericOperator.Sub =>
             List(
-              x86Var.MovQ(argFromAtom(leftAtom), x86Var.Variable(id)),
-              x86Var.SubQ(argFromAtom(rightAtom), x86Var.Variable(id))
+              x86VarIf.MovQ(argFromAtom(leftAtom), x86VarIf.Variable(id)),
+              x86VarIf.SubQ(argFromAtom(rightAtom), x86VarIf.Variable(id))
             )
       // at the moment we only support the function read_int
-      case LMonVar.Call(funId, args) if funId.name == "read_int" =>
+      case LMonIf.ReadIntCall =>
         List(
-          x86Var.CallQ("read_int", 0),
-          x86Var.MovQ(x86.Reg.Rax, x86Var.Variable(id))
+          x86VarIf.CallQ("read_int", 0),
+          x86VarIf.MovQ(x86.Reg.Rax, x86VarIf.Variable(id))
         )
       case _ => Nil
 
-  case LMonVar.PrintStmt(a) =>
+  case LMonIf.PrintStmt(a) =>
     List(
-      x86Var.MovQ(argFromAtom(a), x86.Reg.Rdi),
-      x86Var.CallQ("print_int", 1)
+      x86VarIf.MovQ(argFromAtom(a), x86.Reg.Rdi),
+      x86VarIf.CallQ("print_int", 1)
     )
-  case LMonVar.ExprStmt(e) =>
+  case LMonIf.ExprStmt(e) =>
     e match
       // Evaluate a call expression for its side effects only (e.g., read_int()).
       // The result of the call (returned in RAX) is not stored or used.
       // This is intentional: ExprStmt(Call(...)) means the result is discarded.
-      case LMonVar.Call(funId, args) if funId.name == "read_int" =>
+      case LMonIf.ReadIntCall =>
         List(
-          x86Var.CallQ("read_int", 0)
+          x86VarIf.CallQ("read_int", 0)
         )
       case _ => Nil

@@ -14,19 +14,41 @@ import scala.io.StdIn
 def main(): Unit =
   // val path = "examples/print_42.lang"
   // compile(Paths.get(path))
-  val prog = "x = 5 print(x + 2)"
-  val parsed = LVarReader.fromSExpToModule(parse(prog))
-  // println(parsed)
+  val sexp = Node(
+      List(
+        Symbol("Expr"),
+        Node(
+          List(
+            Symbol("Call"),
+            Node(List(Symbol("Variable"), Symbol("print"))),
+            Node(
+              List(
+                Node(
+                  List(
+                    Symbol("Binary"),
+                    Symbol("Add"),
+                    Node(List(Symbol("Variable"), Symbol("x"))),
+                    Node(List(Symbol("Constant"), Number(2)))
+                  )
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+  val parsed = LVarReader.fromSExpToStmt(sexp)
+  println(parsed)
 
 def compile(input: Path): Path = {
   val basename = input.getFileName.toString.replace(".lang", "")
   val source = readFile(input)
   val sexped = parse(source)
-  val target = replaceMeWithTheActualCompilation(sexped)
+  val target = transformTox86(sexped)
   assemble(target, basename)
 }
 
-def replaceMeWithTheActualCompilation(prog: SExp): Program = {
+def transformTox86(prog: SExp): Program = {
   val parsed = LVarReader.fromSExpToModule(prog)
   val withOutComplexOperands = simplifyModule(parsed)
   val InstrsWithVar = selectInstructions(withOutComplexOperands)

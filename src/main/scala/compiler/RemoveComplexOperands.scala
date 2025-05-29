@@ -1,8 +1,8 @@
 package compiler
 
 import CommonNodes.*
-import LMonVar.Expr
-import LMonVar.Expr.AtomExpr
+import LMonIf.Expr
+import LMonIf.Expr.AtomExpr
 
 /** A generator for unique temporary variable names.
   */
@@ -24,7 +24,7 @@ class NameGenerator {
   * This is used to ensure that the expression is an atom and not a more complex
   * expression.
   */
-def extractAtom(expr: LMonVar.Expr): LMonVar.Atom = expr match
+def extractAtom(expr: LMonIf.Expr): Atom = expr match
   case AtomExpr(a) => a
   case _           => sys.error("Expected an AtomExpr, but got: " + expr)
 
@@ -44,19 +44,19 @@ def extractAtom(expr: LMonVar.Expr): LMonVar.Atom = expr match
   *   - the final simplified expression using only simple operands
   */
 def simplifyExpr(
-    exp: LVar.Expr,
+    exp: LIf.Expr,
     gen: NameGenerator = NameGenerator()
-): (List[LMonVar.AssignStmt], LMonVar.Expr) = exp match
-  case LVar.Constant(n) => (Nil, Expr.AtomExpr(LMonVar.Constant(n)))
-  case LVar.Variable(Identifier(name)) =>
-    (Nil, AtomExpr(LMonVar.Variable(Identifier(name))))
-  case LVar.UnaryOp(op, e) =>
+): (List[LMonIf.AssignStmt], LMonIf.Expr) = exp match
+  case LIf.Constant(n) => (Nil, Expr.AtomExpr(LMonIf.Constant(n)))
+  case LIf.Variable(Identifier(name)) =>
+    (Nil, AtomExpr(LMonIf.Variable(Identifier(name))))
+  case LIf.UnaryNumericOp(op, e) =>
     val (assignments, atomExpr) = simplifyExpr(e, gen)
     val Identifier(tmp) = gen.freshName()
-    val newAssignment: LMonVar.AssignStmt =
-      LMonVar.AssignStmt(
+    val newAssignment: LMonIf.AssignStmt =
+      LMonIf.AssignStmt(
         Identifier(tmp),
-        LMonVar.UnaryOp(
+        LMonIf.UnaryNumericOp(
           op,
           extractAtom(
             atomExpr
@@ -66,15 +66,15 @@ def simplifyExpr(
     val extendedAssignments = assignments :+ newAssignment
     (
       extendedAssignments,
-      AtomExpr(LMonVar.Variable(Identifier(tmp)))
+      AtomExpr(LMonIf.Variable(Identifier(tmp)))
     )
-  case LVar.BinaryOp(op, lhs, rhs) =>
+  case LIf.BinaryNumericOp(op, lhs, rhs) =>
     val (assignmentsLeft, atomExprLeft) = simplifyExpr(lhs, gen)
     val (assignmentsRight, atomExprRight) = simplifyExpr(rhs, gen)
     val Identifier(tmp) = gen.freshName()
-    val newAssignment: LMonVar.AssignStmt = LMonVar.AssignStmt(
+    val newAssignment: LMonIf.AssignStmt = LMonIf.AssignStmt(
       Identifier(tmp),
-      LMonVar.BinaryOp(
+      LMonIf.BinaryNumericOp(
         op,
         extractAtom(atomExprLeft),
         extractAtom(atomExprRight)
@@ -84,24 +84,17 @@ def simplifyExpr(
       assignmentsLeft ++ assignmentsRight :+ newAssignment
     (
       extendedAssignments,
-      AtomExpr(LMonVar.Variable(Identifier(tmp)))
+      AtomExpr(LMonIf.Variable(Identifier(tmp)))
     )
-  case LVar.Call(Identifier(name), args) =>
-    val simplified = args.map(simplifyExpr(_, gen))
-    val assignments = simplified.flatMap(_._1)
-    val atomExprArgs = simplified.map(_._2)
+  case LIf.ReadIntCall =>
     val Identifier(tmp) = gen.freshName()
-    val newAssignment: LMonVar.AssignStmt =
-      LMonVar.AssignStmt(
-        Identifier(tmp),
-        LMonVar.Call(
-          Identifier(name),
-          atomExprArgs.map(extractAtom)
-        )
-      )
+    val newAssignment: LMonIf.AssignStmt = LMonIf.AssignStmt(
+      Identifier(tmp),
+      LMonIf.ReadIntCall
+    )
     (
-      assignments :+ newAssignment,
-      AtomExpr(LMonVar.Variable(Identifier(tmp)))
+      List(newAssignment),
+      AtomExpr(LMonIf.Variable(Identifier(tmp)))
     )
 
   /** Simplifies all expressions within a statement by extracting complex
@@ -118,17 +111,20 @@ def simplifyExpr(
     *   a list of simplified statements, including any generated temporary
     *   assignments
     */
-def simplifyStmt(stmt: LVar.Stmt, gen: NameGenerator = NameGenerator()): List[LMonVar.Stmt] =
+def simplifyStmt(
+    stmt: LIf.Stmt,
+    gen: NameGenerator = NameGenerator()
+): List[LMonIf.Stmt] =
   stmt match
-    case LVar.ExprStmt(e) =>
+    case LIf.ExprStmt(e) =>
       val (assignments, expr) = simplifyExpr(e, gen)
-      assignments :+ LMonVar.ExprStmt(expr)
-    case LVar.PrintStmt(e) =>
+      assignments :+ LMonIf.ExprStmt(expr)
+    case LIf.PrintStmt(e) =>
       val (assignments, atomExpr) = simplifyExpr(e, gen)
-      assignments :+ LMonVar.PrintStmt(extractAtom(atomExpr))
-    case LVar.AssignStmt(Identifier(name), e) =>
+      assignments :+ LMonIf.PrintStmt(extractAtom(atomExpr))
+    case LIf.AssignStmt(Identifier(name), e) =>
       val (assignments, expr) = simplifyExpr(e, gen)
-      assignments :+ LMonVar.AssignStmt(Identifier(name), expr)
+      assignments :+ LMonIf.AssignStmt(Identifier(name), expr)
 
     /** Simplifies all statements in a module by flattening expressions
       * throughout.
@@ -142,6 +138,9 @@ def simplifyStmt(stmt: LVar.Stmt, gen: NameGenerator = NameGenerator()): List[LM
       *   a new module with all expressions simplified and lifted into flat
       *   statements
       */
-def simplifyModule(module: LVar.Module, gen: NameGenerator = NameGenerator()): LMonVar.Module =
+def simplifyModule(
+    module: LIf.Module,
+    gen: NameGenerator = NameGenerator()
+): LMonIf.Module =
   val simplifiedStmts = module.stmts.flatMap(simplifyStmt(_, gen))
-  LMonVar.Module(simplifiedStmts)
+  LMonIf.Module(simplifiedStmts)
