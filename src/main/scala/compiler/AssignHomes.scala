@@ -104,6 +104,19 @@ def assignHomes(instrs: List[x86Var.Instr]): (List[x86.Instr], Int) = {
     case x86Var.CallQ(label, arity) =>
       // Calls do not need variable resolution
       (x86.Instr.CallQ(label, arity), locations, nextFreeOffset)
+
+    case x86Var.PushQ(arg) =>
+      val (resolvedArg, updatedLocations, updatedOffset) =
+        assignArg(arg, locations, nextFreeOffset)
+      (x86.Instr.PushQ(resolvedArg), updatedLocations, updatedOffset)
+
+    case x86Var.PopQ(arg) =>
+      val (resolvedArg, updatedLocations, updatedOffset) =
+        assignArg(arg, locations, nextFreeOffset)
+      (x86.Instr.PopQ(resolvedArg), updatedLocations, updatedOffset)
+
+    case x86Var.RetQ =>
+      (x86.Instr.RetQ, locations, nextFreeOffset)
   }
 
   // Initial values: empty instruction list, empty locations map, and offset starting at -8
@@ -114,6 +127,6 @@ def assignHomes(instrs: List[x86Var.Instr]): (List[x86.Instr], Int) = {
           assignInstr(instr, currentLocations, currentOffset)
         (translatedInstrs :+ translatedInstr, updatedLocations, updatedOffset)
     }
-  val stackSpace = -finalOffset 
+  val stackSpace = -finalOffset
   (finalInstrs, stackSpace)
 }

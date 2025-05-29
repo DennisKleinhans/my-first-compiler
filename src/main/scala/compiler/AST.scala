@@ -120,4 +120,7 @@ object x86Var {
     case SubQ(src: Arg, dest: Arg)
     case NegQ(arg: Arg)
     case CallQ(label: String, arity: Int)
+    case PushQ(arg: Arg)
+    case PopQ(arg: Arg)
+    case RetQ
 }
