@@ -3,11 +3,19 @@ package lang
 case class LexerError(message: String) extends RuntimeException(message)
 
 enum Token {
-  case LPAREN, RPAREN, COMMA // Punctuation: ( ) ,
-  case PLUS, MINUS, EQUAL // Operators: + - =
-  case NUMBER(value: Long) // 123
-  case IDENT(value: String) // input_int print
-  case EOF // End of input
+  case COMMA, COLON                 // , :
+  case LPAREN, RPAREN               // ( )
+  case LCURLY, RCURLY               // { }
+  case LBRACKET, RBRACKET           // [ ]
+  case PLUS, MINUS, EQUAL           // Operators: + - =
+  case EQ, NEQ, LT, LE, GT, GE      // Operators == != <= > >=
+  case AND, OR, NOT                 // && || !
+  case TRUE, FALSE                  // true false
+  case NUMBER(value: Long)          // 123
+  case IDENT(value: String)         // input_int print
+  case EOF                          // End of input
+  case IF, THEN, ELSE
+  case WHILE
 }
 
 class Lexer(input: String) extends Iterator[Token] {
@@ -60,6 +68,21 @@ class Lexer(input: String) extends Iterator[Token] {
       case ')' =>
         skip()
         Token.RPAREN
+      case '{' =>
+        skip()
+        Token.LCURLY
+      case '}' =>
+        skip()
+        Token.RCURLY
+      case '[' =>
+        skip()
+        Token.LBRACKET
+      case ']' =>
+        skip()
+        Token.RBRACKET
+      case ':' =>
+        skip()
+        Token.COLON
       case ',' =>
         skip()
         Token.COMMA
@@ -69,13 +92,54 @@ class Lexer(input: String) extends Iterator[Token] {
       case '-' =>
         skip()
         Token.MINUS
+      case '!' =>
+        skip()
+        currentChar match {
+          case '=' => skip(); Token.NEQ // !=
+          case _ => Token.NOT           // !
+        }
+      case '&' =>
+        skip()
+        currentChar match {
+          case '&' => skip(); Token.AND // &&
+          case _ => throw LexerError("Conjunction uses two &s (that is, &&)")
+        }
+      case '|' =>
+        skip()
+        currentChar match {
+          case '|' => skip(); Token.OR // &&
+          case _ => throw LexerError("Disjunction uses two |s (that is, ||)")
+        }
       case '=' =>
         skip()
-        Token.EQUAL
+        currentChar match {
+          case '=' => skip(); Token.EQ // ==
+          case _ => Token.EQUAL        // =
+        }
+      case '<' =>
+        skip()
+        currentChar match {
+          case '=' => skip(); Token.LE // <=
+          case _ => Token.LT           // <
+        }
+      case '>' =>
+        skip()
+        currentChar match {
+          case '=' => skip(); Token.GE // >=
+          case _ => Token.GT           // >
+        }
       case c if c.isDigit =>
         readNumber()
       case c if c.isLetter || c == '_' =>
-        readIdent()
+        readIdent() match {
+          case Token.IDENT("if")    => Token.IF
+          case Token.IDENT("while") => Token.WHILE
+          case Token.IDENT("then")  => Token.THEN
+          case Token.IDENT("else")  => Token.ELSE
+          case Token.IDENT("true")  => Token.TRUE
+          case Token.IDENT("false") => Token.FALSE
+          case other => other
+        }
       case _ => throw LexerError(s"Unexpected character '${currentChar}' at position $pos")
     }
 }
