@@ -1,9 +1,9 @@
 package compiler
 
+import x86.*
 import x86.Instr
 import x86.Instr.*
-import x86.Arg.*
-import x86.Reg.*
+import x86.Immediate
 
 def preludeAndConclusion(
     instrs: List[x86.Instr],
@@ -12,14 +12,14 @@ def preludeAndConclusion(
   val alignedSpace = ((stackSpace + 15) / 16) * 16
 
   val prolog = List(
-    PushQ(Register(Rbp)),
-    MovQ(Register(Rsp), Register(Rbp)),
-    SubQ(Immediate(alignedSpace), Register(Rsp))
+    PushQ(Reg.Rbp),
+    MovQ(Reg.Rsp, Reg.Rbp),
+    SubQ(Immediate(alignedSpace), Reg.Rsp)
   )
   val epilog = List(
-    AddQ(Immediate(alignedSpace), Register(Rsp)),
-    PopQ(Register(Rbp)),
-    MovQ(Immediate(0), Register(Rax)),
+    AddQ(Immediate(alignedSpace), Reg.Rsp),
+    PopQ(Reg.Rbp),
+    MovQ(Immediate(0), Reg.Rax),
     RetQ
   )
   prolog ++ instrs ++ epilog

@@ -1,9 +1,8 @@
 package compiler
 
-import x86.Instr
+import x86.*
 import x86.Instr.*
 import x86.Reg.*
-import x86.Arg.*
 
 def isTooBig(imm: Long): Boolean = imm > Int.MaxValue || imm < Int.MinValue
 
@@ -18,25 +17,25 @@ def isTooBig(imm: Long): Boolean = imm > Int.MaxValue || imm < Int.MinValue
 def patchInstructions(instrs: List[x86.Instr]): List[x86.Instr] =
   instrs.flatMap {
     case MovQ(src @ Deref(_, _), dest @ Deref(_, _)) =>
-      List(MovQ(src, Register(Rax)), MovQ(Register(Rax), dest))
+      List(MovQ(src, Reg.Rax), MovQ(Reg.Rax, dest))
     case AddQ(src @ Deref(_, _), dest @ Deref(_, _)) =>
-      List(MovQ(src, Register(Rax)), AddQ(Register(Rax), dest))
+      List(MovQ(src, Reg.Rax), AddQ(Reg.Rax, dest))
     case SubQ(src @ Deref(_, _), dest @ Deref(_, _)) =>
-      List(MovQ(src, Register(Rax)), SubQ(Register(Rax), dest))
+      List(MovQ(src, Reg.Rax), SubQ(Reg.Rax, dest))
     case NegQ(arg @ Deref(_, _)) =>
       List(
-        MovQ(arg, Register(Rax)),
-        NegQ(Register(Rax)),
-        MovQ(Register(Rax), arg)
+        MovQ(arg, Reg.Rax),
+        NegQ(Reg.Rax),
+        MovQ(Reg.Rax, arg)
       )
     // also patch immediate values that are too big to fit in a 32-bit immediate
     case MovQ(imm @ Immediate(n), dest @ Deref(_, _)) if isTooBig(n) =>
-      List(MovQ(imm, Register(Rax)), MovQ(Register(Rax), dest))
+      List(MovQ(imm, Reg.Rax), MovQ(Reg.Rax, dest))
 
     case AddQ(imm @ Immediate(n), dest @ Deref(_, _)) if isTooBig(n) =>
-      List(MovQ(imm, Register(Rax)), AddQ(Register(Rax), dest))
+      List(MovQ(imm, Reg.Rax), AddQ(Reg.Rax, dest))
 
     case SubQ(imm @ Immediate(n), dest @ Deref(_, _)) if isTooBig(n) =>
-      List(MovQ(imm, Register(Rax)), SubQ(Register(Rax), dest))
+      List(MovQ(imm, Reg.Rax), SubQ(Reg.Rax, dest))
     case other => List(other)
   }

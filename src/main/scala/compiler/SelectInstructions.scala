@@ -75,13 +75,13 @@ def selectInstructions(stmt: LMonVar.Stmt): List[x86Var.Instr] = stmt match
       case LMonVar.Call(funId, args) if funId.name == "read_int" =>
         List(
           x86Var.CallQ("read_int", 0),
-          x86Var.MovQ(x86Var.Register(x86.Reg.Rax), x86Var.Variable(id))
+          x86Var.MovQ(x86.Reg.Rax, x86Var.Variable(id))
         )
       case _ => Nil
 
   case LMonVar.PrintStmt(a) =>
     List(
-      x86Var.MovQ(argFromAtom(a), x86Var.Register(x86.Reg.Rdi)),
+      x86Var.MovQ(argFromAtom(a), x86.Reg.Rdi),
       x86Var.CallQ("print_int", 1)
     )
   case LMonVar.ExprStmt(e) =>

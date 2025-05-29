@@ -100,25 +100,43 @@ object LMonVar {
   * before final assembly generation.
   */
 object x86Var {
-  export Arg.*
   export Instr.*
 
-  /** An argument in x86Var can be an immediate value, a variable reference, or
-    * a register.
+  /*
+   * An identifier in x86Var represents a variable name or label.
+   * It is used to refer to variables in the x86Var instructions.
+   */
+  case class Variable(id: Identifier)
+
+  /*
+   * An immediate value in x86Var represents a constant integer that can be
+   * used directly in instructions.
+   */
+  case class Immediate(n: Long)
+
+  /** A location in x86Var can be a register or a variable.
+    *
+    * Registers are used for fast access to data, while variables represent
+    * memory locations that may require stack allocation.
     */
-  enum Arg:
-    case Immediate(n: Long)
-    case Variable(id: Identifier)
-    case Register(reg: x86.Reg)
+  type Location = x86.Reg | Variable
+
+  /** An argument in x86Var can be a location (register or variable) or an
+    * immediate value (constant).
+    *
+    * This allows instructions to operate on both memory locations and immediate
+    * values.
+    */
+  type Arg = Location | Immediate
 
   /** An instruction in x86Var represents a single operation in the x86
     * architecture. It can be a move, arithmetic operation, or a function call.
     */
   enum Instr:
-    case MovQ(src: Arg, dest: Arg)
-    case AddQ(src: Arg, dest: Arg)
-    case SubQ(src: Arg, dest: Arg)
-    case NegQ(arg: Arg)
+    case MovQ(src: Arg, dest: Location)
+    case AddQ(src: Arg, dest: Location)
+    case SubQ(src: Arg, dest: Location)
+    case NegQ(arg: Location)
     case CallQ(label: String, arity: Int)
     case PushQ(arg: Arg)
     case PopQ(arg: Arg)

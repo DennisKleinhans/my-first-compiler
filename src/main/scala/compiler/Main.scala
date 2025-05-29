@@ -17,7 +17,7 @@ def main(): Unit =
   val prog = "x = 5 print(x + 2)"
   val parsed = LVarReader.fromSExpToModule(parse(prog))
   // println(parsed)
-  
+
 def compile(input: Path): Path = {
   val basename = input.getFileName.toString.replace(".lang", "")
   val source = readFile(input)
