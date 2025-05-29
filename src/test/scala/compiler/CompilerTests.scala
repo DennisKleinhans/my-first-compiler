@@ -316,7 +316,7 @@ class CompilerTests extends FunSuite {
     val expected = List(
       x86Var.CallQ("read_int", 0),
       x86Var.MovQ(
-        x86Var.Register(x86.Reg.Rax),
+        x86.Reg.Rax,
         x86Var.Variable(Identifier("$tmp$_1"))
       ),
       x86Var.MovQ(x86Var.Immediate(1), x86Var.Variable(Identifier("$tmp$_2"))),
