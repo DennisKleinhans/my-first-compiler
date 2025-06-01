@@ -1,9 +1,5 @@
 package compiler
 
-import CommonNodes.*
-import CommonNodes.Atom
-import x86.Cc
-
 object CommonNodes {
 
   /** An atom in can be a constant value (Long or Boolean) or a variable
@@ -60,6 +56,7 @@ object CommonNodes {
   * interpretation or compilation.
   */
 object LIf {
+  import CommonNodes.*
   export Expr.*
   export Stmt.*
 
@@ -87,9 +84,9 @@ object LIf {
     case Constant(n: Long)
     case ConstantBool(b: Boolean)
     case UnaryNumericOp(op: UnaryNumericOperator, e: Expr)
-    case UnaryLogicOp(op: UnaryLogicOperator, lhs: Expr, rhs: Expr)
+    case UnaryLogicOp(op: UnaryLogicOperator, e: Expr)
     case BinaryNumericOp(op: BinaryNumericOperator, lhs: Expr, rhs: Expr)
-    case BianryLogicOp(op: BinaryLogicOperator, lhs: Expr, rhs: Expr)
+    case BinaryLogicOp(op: BinaryLogicOperator, lhs: Expr, rhs: Expr)
     case Compare(cmp: CompareOperator, lhs: Expr, rhs: Expr)
     case ReadIntCall
     case Variable(id: Identifier)
@@ -103,6 +100,8 @@ object LIf {
   * interpretation or compilation.
   */
 object LMonIf {
+  import CommonNodes.*
+  import CommonNodes.Atom
   export Expr.*
   export Stmt.*
   export Atom.*
@@ -150,6 +149,8 @@ object LMonIf {
   * if-else constructs.
   */
 object CIf {
+  import CommonNodes.*
+  import CommonNodes.Atom
 
   /** An expression in CIf can be a atom (Long, Boolean or Variable), a unary
     * numeric operation, a binary numeric operation, a function call with the
@@ -197,6 +198,8 @@ object CIf {
   * before final assembly generation.
   */
 object x86VarIf {
+  import x86.Cc
+  import CommonNodes.Identifier
   export Instr.*
 
   /*

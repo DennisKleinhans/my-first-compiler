@@ -356,7 +356,7 @@ class CompilerTests extends FunSuite {
     )
   }
 
-  test("selectInstructions - complex arithmetic ()") {
+  test("selectInstructions - complex arithmetic") {
     val programm = "1+(3+4)-8"
     val expected = List(
       x86VarIf
@@ -384,6 +384,76 @@ class CompilerTests extends FunSuite {
       )
     )
     assertEquals(result, expected)
+  }
+
+  // ───────────────────────────────────────────────────────────────
+  // ─── shrink Tests ──────────────────────────────────────────────
+  // ───────────────────────────────────────────────────────────────
+
+  val andExpr = LIf.BinaryLogicOp(
+    BinaryLogicOperator.And,
+    LIf.Constant(1),
+    LIf.Constant(2)
+  )
+
+  val orExpr = LIf.BinaryLogicOp(
+    BinaryLogicOperator.Or,
+    LIf.Constant(1),
+    LIf.Constant(2)
+  )
+
+  val nestedAndInPrint = LIf.PrintStmt(andExpr)
+  val nestedAndInAssign = LIf.AssignStmt(Identifier("x"), andExpr)
+
+  test("shrinkExpr - and") {
+    val expected =
+      LIf.IfExpr(LIf.Constant(1), LIf.Constant(2), LIf.ConstantBool(false))
+    assertEquals(shrinkExpr(andExpr), expected)
+  }
+
+  test("shrinkExpr - or") {
+    val expected =
+      LIf.IfExpr(LIf.Constant(1), LIf.ConstantBool(true), LIf.Constant(2))
+    assertEquals(shrinkExpr(orExpr), expected)
+  }
+
+  test("shrinkExpr - nested expression") {
+    val input =
+      LIf.BinaryLogicOp(BinaryLogicOperator.And, LIf.Constant(3), orExpr)
+    val expected = LIf.IfExpr(
+      LIf.Constant(3),
+      LIf.IfExpr(LIf.Constant(1), LIf.ConstantBool(true), LIf.Constant(2)),
+      LIf.ConstantBool(false)
+    )
+    assertEquals(shrinkExpr(input), expected)
+  }
+
+  test("shrinkStmt - print") {
+    val expected = LIf.PrintStmt(
+      LIf.IfExpr(LIf.Constant(1), LIf.Constant(2), LIf.ConstantBool(false))
+    )
+    assertEquals(shrinkStmt(nestedAndInPrint), expected)
+  }
+
+  test("shrinkStmt - assign") {
+    val expected = LIf.AssignStmt(
+      Identifier("x"),
+      LIf.IfExpr(LIf.Constant(1), LIf.Constant(2), LIf.ConstantBool(false))
+    )
+    assertEquals(shrinkStmt(nestedAndInAssign), expected)
+  }
+
+  test("shrinkModule - assing and print") {
+    val input = LIf.Module(nestedAndInAssign :: nestedAndInPrint :: Nil)
+    val expected = LIf.Module(
+      (LIf.AssignStmt(
+        Identifier("x"),
+        LIf.IfExpr(LIf.Constant(1), LIf.Constant(2), LIf.ConstantBool(false))
+      )) :: LIf.PrintStmt(
+        LIf.IfExpr(LIf.Constant(1), LIf.Constant(2), LIf.ConstantBool(false))
+      ) :: Nil
+    )
+    assertEquals(shrinkModule(input), expected)
   }
 
   // ───────────────────────────────────────────────────────────────
