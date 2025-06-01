@@ -48,8 +48,12 @@ def simplifyExpr(
     gen: NameGenerator = NameGenerator()
 ): (List[LMonIf.AssignStmt], LMonIf.Expr) = exp match
   case LIf.Constant(n) => (Nil, Expr.AtomExpr(LMonIf.Constant(n)))
+
+  case LIf.ConstantBool(b) => (Nil, Expr.AtomExpr(LMonIf.ConstantBool(b)))
+
   case LIf.Variable(Identifier(name)) =>
     (Nil, AtomExpr(LMonIf.Variable(Identifier(name))))
+
   case LIf.UnaryNumericOp(op, e) =>
     val (assignments, atomExpr) = simplifyExpr(e, gen)
     val Identifier(tmp) = gen.freshName()
@@ -68,6 +72,7 @@ def simplifyExpr(
       extendedAssignments,
       AtomExpr(LMonIf.Variable(Identifier(tmp)))
     )
+
   case LIf.BinaryNumericOp(op, lhs, rhs) =>
     val (assignmentsLeft, atomExprLeft) = simplifyExpr(lhs, gen)
     val (assignmentsRight, atomExprRight) = simplifyExpr(rhs, gen)
@@ -86,6 +91,30 @@ def simplifyExpr(
       extendedAssignments,
       AtomExpr(LMonIf.Variable(Identifier(tmp)))
     )
+
+  case LIf.Compare(cmp, e1, e2) => 
+    val (assignmentsE1, atomExprE1) = simplifyExpr(e1, gen)
+    val (assignmentsE2, atomExprE2) = simplifyExpr(e2, gen)
+    val Identifier(tmp) = gen.freshName()
+    val newAssignment: LMonIf.AssignStmt = LMonIf.AssignStmt(
+      Identifier(tmp),
+      LMonIf.Compare(
+        cmp,
+        extractAtom(atomExprE1),
+        extractAtom(atomExprE2)
+      )
+    )
+    val extendedAssignments =
+      assignmentsE1 ++ assignmentsE2 :+ newAssignment
+    (
+      extendedAssignments,
+      AtomExpr(LMonIf.Variable(Identifier(tmp)))
+    )
+
+  case LIf.UnaryLogicOp(op, e) => ???
+
+  case LIf.IfExpr(test, thn, els) => ???
+
   case LIf.ReadIntCall =>
     val Identifier(tmp) = gen.freshName()
     val newAssignment: LMonIf.AssignStmt = LMonIf.AssignStmt(
@@ -96,6 +125,9 @@ def simplifyExpr(
       List(newAssignment),
       AtomExpr(LMonIf.Variable(Identifier(tmp)))
     )
+
+  case LIf.BinaryLogicOp(_, _, _) =>
+    sys error "rached BinaryLogicOp, but this should not happen, because this would be removed in the shrink pass"
 
   /** Simplifies all expressions within a statement by extracting complex
     * subexpressions.
@@ -119,12 +151,16 @@ def simplifyStmt(
     case LIf.ExprStmt(e) =>
       val (assignments, expr) = simplifyExpr(e, gen)
       assignments :+ LMonIf.ExprStmt(expr)
+
     case LIf.PrintStmt(e) =>
       val (assignments, atomExpr) = simplifyExpr(e, gen)
       assignments :+ LMonIf.PrintStmt(extractAtom(atomExpr))
+
     case LIf.AssignStmt(Identifier(name), e) =>
       val (assignments, expr) = simplifyExpr(e, gen)
       assignments :+ LMonIf.AssignStmt(Identifier(name), expr)
+
+    case LIf.IfStmt(test, thn, els) => ???
 
     /** Simplifies all statements in a module by flattening expressions
       * throughout.
