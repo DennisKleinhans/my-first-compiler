@@ -91,7 +91,6 @@ object LIf {
     case ReadIntCall
     case Variable(id: Identifier)
     case IfExpr(condExpr: Expr, thenExpr: Expr, elseExpr: Expr)
-
 }
 
 /** The abstract syntax tree (AST) for the LMonIf language.

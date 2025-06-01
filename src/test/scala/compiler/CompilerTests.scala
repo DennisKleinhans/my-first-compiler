@@ -74,7 +74,7 @@ class CompilerTests extends FunSuite {
       expected: LIf.Expr
   ): Unit = {
     test(s"fromSExpToExpr - $name") {
-      assertEquals(LVarReader.fromSExpToExpr(input), expected)
+      assertEquals(LIfReader.fromSExpToExpr(input), expected)
     }
   }
 
@@ -111,7 +111,7 @@ class CompilerTests extends FunSuite {
       )
     )
     assertEquals(
-      LVarReader.fromSExpToStmt(sexp),
+      LIfReader.fromSExpToStmt(sexp),
       LIf.ExprStmt(onePlusOneAst)
     )
   }
@@ -125,7 +125,7 @@ class CompilerTests extends FunSuite {
       )
     )
     assertEquals(
-      LVarReader.fromSExpToStmt(sexp),
+      LIfReader.fromSExpToStmt(sexp),
       LIf.AssignStmt(Identifier("x"), LIf.Constant(5))
     )
   }
@@ -155,7 +155,7 @@ class CompilerTests extends FunSuite {
       )
     )
     assertEquals(
-      LVarReader.fromSExpToStmt(sexp),
+      LIfReader.fromSExpToStmt(sexp),
       LIf.PrintStmt(
         LIf.BinaryNumericOp(
           BinaryNumericOperator.Add,
@@ -172,21 +172,21 @@ class CompilerTests extends FunSuite {
 
   test("LIntInterpreter.evalExpr - binary: 1 + 1") {
     assertEquals(
-      LIntInterpreter.evalExpr(LVarReader.fromSExpToExpr(sexpOnePlusOne)),
+      LIntInterpreter.evalExpr(LIfReader.fromSExpToExpr(sexpOnePlusOne)),
       2L
     )
   }
 
   test("LIntInterpreter.evalExpr - binary: 4 - 2") {
     assertEquals(
-      LIntInterpreter.evalExpr(LVarReader.fromSExpToExpr(sexpFourMinusTwo)),
+      LIntInterpreter.evalExpr(LIfReader.fromSExpToExpr(sexpFourMinusTwo)),
       2L
     )
   }
 
   test("LIntInterpreter.evalExpr - unary: -8") {
     assertEquals(
-      LIntInterpreter.evalExpr(LVarReader.fromSExpToExpr(sexpMinusEight)),
+      LIntInterpreter.evalExpr(LIfReader.fromSExpToExpr(sexpMinusEight)),
       -8L
     )
   }
@@ -197,7 +197,7 @@ class CompilerTests extends FunSuite {
 
     val outputStream = new java.io.ByteArrayOutputStream()
     Console.withOut(outputStream) {
-      LIntInterpreter.evalModule(LVarReader.fromSExpToModule(parse(input)))
+      LIntInterpreter.evalModule(LIfReader.fromSExpToModule(parse(input)))
     }
 
     val actualOutput = outputStream.toString
@@ -272,7 +272,7 @@ class CompilerTests extends FunSuite {
   test("simplify to LMonVar") {
     val program = "1 + (2+2) -8"
     val result = simplifyModule(
-      LVarReader.fromSExpToModule(parse(program))
+      LIfReader.fromSExpToModule(parse(program))
     )
 
     val expected = LMonIf.Module(
@@ -320,7 +320,7 @@ class CompilerTests extends FunSuite {
     val programm = "1+2"
     val result = selectInstructions(
       simplifyModule(
-        LVarReader.fromSExpToModule((parse(programm)))
+        LIfReader.fromSExpToModule((parse(programm)))
       )
     )
     val expected = List(
@@ -338,7 +338,7 @@ class CompilerTests extends FunSuite {
     val programm = "1 + read_int()"
     val result = selectInstructions(
       simplifyModule(
-        LVarReader.fromSExpToModule((parse(programm)))
+        LIfReader.fromSExpToModule((parse(programm)))
       )
     )
     val expected = List(
@@ -380,7 +380,7 @@ class CompilerTests extends FunSuite {
     )
     val result = selectInstructions(
       simplifyModule(
-        LVarReader.fromSExpToModule(parse(programm))
+        LIfReader.fromSExpToModule(parse(programm))
       )
     )
     assertEquals(result, expected)
@@ -464,23 +464,75 @@ class CompilerTests extends FunSuite {
     val printCall = "print(1+1)"
 
     val expected = LIf.Module(
-      List(
-        LIf.PrintStmt(
-          LIf.BinaryNumericOp(
-            BinaryNumericOperator.Add,
-            LIf.Constant(1),
-            LIf.Constant(1)
-          )
+      LIf.PrintStmt(
+        LIf.BinaryNumericOp(
+          BinaryNumericOperator.Add,
+          LIf.Constant(1),
+          LIf.Constant(1)
         )
-      )
+      ) :: Nil
     )
-    assertEquals(LVarReader.fromSExpToModule(parse(printCall)), expected)
+    assertEquals(LIfReader.fromSExpToModule(parse(printCall)), expected)
+  }
+
+  test("End-to-End: object language -> AST - IfExpr") {
+    val input = "if 1 < 2 then true else false"
+    val expected = LIf.Module(
+      LIf.ExprStmt(
+        LIf.IfExpr(
+          LIf.Compare(CompareOperator.Lt, LIf.Constant(1), LIf.Constant(2)),
+          LIf.ConstantBool(true),
+          LIf.ConstantBool(false)
+        )
+      ) :: Nil
+    )
+
+    assertEquals(LIfReader.fromSExpToModule(parse(input)), expected)
+  }
+  test("End-to-End: object language -> AST - IfStmt") {
+    val input = "if (1 < 2) {true} else {false}"
+    val expected = LIf.Module(
+      LIf.IfStmt(
+        LIf.Compare(CompareOperator.Lt, LIf.Constant(1), LIf.Constant(2)),
+        LIf.ExprStmt(LIf.ConstantBool(true)) :: Nil,
+        LIf.ExprStmt(LIf.ConstantBool(false)) :: Nil
+      ) :: Nil
+    )
+
+    assertEquals(LIfReader.fromSExpToModule(parse(input)), expected)
+  }
+  test("End-to-End: object language -> AST - BinaryLogicOp") {
+    val input = "true && false"
+    val expected = LIf.Module(
+      LIf.ExprStmt(
+        LIf.BinaryLogicOp(
+          BinaryLogicOperator.And,
+          LIf.ConstantBool(true),
+          LIf.ConstantBool(false)
+        )
+      ) :: Nil
+    )
+
+    assertEquals(LIfReader.fromSExpToModule(parse(input)), expected)
+  }
+  test("End-to-End: object language -> AST - UnaryLogicOp") {
+    val input = "!(1 < 2)"
+    val expected = LIf.Module(
+      LIf.ExprStmt(
+        LIf.UnaryLogicOp(
+          UnaryLogicOperator.Not,
+          LIf.Compare(CompareOperator.Lt, LIf.Constant(1), LIf.Constant(2))
+        )
+      ) :: Nil
+    )
+
+    assertEquals(LIfReader.fromSExpToModule(parse(input)), expected)
   }
 
   test("End-to-End: object language -> eval result") {
     val program = "1 + (4 - 2) - (-8)"
     assertEquals(
-      LIntInterpreter.evalModule(LVarReader.fromSExpToModule(parse(program))),
+      LIntInterpreter.evalModule(LIfReader.fromSExpToModule(parse(program))),
       11L
     )
   }

@@ -14,31 +14,9 @@ import scala.io.StdIn
 def main(): Unit =
   // val path = "examples/print_42.lang"
   // compile(Paths.get(path))
-  val sexp = Node(
-      List(
-        Symbol("Expr"),
-        Node(
-          List(
-            Symbol("Call"),
-            Node(List(Symbol("Variable"), Symbol("print"))),
-            Node(
-              List(
-                Node(
-                  List(
-                    Symbol("Binary"),
-                    Symbol("Add"),
-                    Node(List(Symbol("Variable"), Symbol("x"))),
-                    Node(List(Symbol("Constant"), Number(2)))
-                  )
-                )
-              )
-            )
-          )
-        )
-      )
-    )
-  val parsed = LVarReader.fromSExpToStmt(sexp)
-  println(parsed)
+  val parsed = parse("if (true) {1} else {2}")
+  val sexped = LIfReader.fromSExpToModule(parsed)
+  println(sexped)
 
 def compile(input: Path): Path = {
   val basename = input.getFileName.toString.replace(".lang", "")
@@ -49,7 +27,8 @@ def compile(input: Path): Path = {
 }
 
 def transformTox86(prog: SExp): Program = {
-  val parsed = LVarReader.fromSExpToModule(prog)
+  val parsed = LIfReader.fromSExpToModule(prog)
+  val shrinked = shrinkModule(parsed)
   val withOutComplexOperands = simplifyModule(parsed)
   val InstrsWithVar = selectInstructions(withOutComplexOperands)
   val (instrsWithHome, stackSpace) = assignHomes(InstrsWithVar)
