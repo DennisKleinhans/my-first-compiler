@@ -135,7 +135,6 @@ object LMonIf {
     case AtomExpr(a: Atom)
     case IfExpr(condExpr: Expr, thenExpr: Expr, elseExpr: Expr)
     case Begin(stmts: List[Stmt], e: Expr)
-
 }
 
 /** The abstract syntax tree (AST) for the CIf language.

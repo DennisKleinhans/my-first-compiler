@@ -269,7 +269,7 @@ class CompilerTests extends FunSuite {
   // ─── LMonVar Tests ─────────────────────────────────────────────
   // ───────────────────────────────────────────────────────────────
 
-  test("simplify to LMonVar") {
+  test("simplify to LMonVar - nested arithmetic") {
     val program = "1 + (2+2) -8"
     val result = simplifyModule(
       LIfReader.fromSExpToModule(parse(program))
@@ -310,6 +310,94 @@ class CompilerTests extends FunSuite {
     )
 
     assertEquals(result, expected)
+  }
+
+  test("simplify to LMonIf - IfExpr") {
+    val input = "if 1==1 then 1+1 else 2+2"
+    val output = simplifyModule(
+      LIfReader.fromSExpToModule(parse(input))
+    )
+
+    val expected = LMonIf.Module(
+      List(
+        LMonIf.AssignStmt(
+          Identifier("$tmp$_1"),
+          LMonIf
+            .Compare(CompareOperator.Eq, LMonIf.Constant(1), LMonIf.Constant(1))
+        ),
+        LMonIf.ExprStmt(
+          LMonIf.IfExpr(
+            LMonIf.AtomExpr(LMonIf.Variable(Identifier("$tmp$_1"))),
+            LMonIf.Begin(
+              List(
+                LMonIf.AssignStmt(
+                  Identifier("$tmp$_2"),
+                  LMonIf.BinaryNumericOp(
+                    BinaryNumericOperator.Add,
+                    LMonIf.Constant(1),
+                    LMonIf.Constant(1)
+                  )
+                )
+              ),
+              LMonIf.AtomExpr(LMonIf.Variable(Identifier("$tmp$_2")))
+            ),
+            LMonIf.Begin(
+              List(
+                LMonIf.AssignStmt(
+                  Identifier("$tmp$_3"),
+                  LMonIf.BinaryNumericOp(
+                    BinaryNumericOperator.Add,
+                    LMonIf.Constant(2),
+                    LMonIf.Constant(2)
+                  )
+                )
+              ),
+              LMonIf.AtomExpr(LMonIf.Variable(Identifier("$tmp$_3")))
+            )
+          )
+        )
+      )
+    )
+
+    assertEquals(output, expected)
+  }
+
+  test("simplify Module - IfStmt") {
+
+    val expected = LMonIf.Module(
+      List(
+        LMonIf.AssignStmt(
+          Identifier("$tmp$_1"),
+          LMonIf
+            .Compare(CompareOperator.Eq, LMonIf.Constant(1), LMonIf.Constant(1))
+        ),
+        LMonIf.IfStmt(
+          LMonIf.AtomExpr(LMonIf.Variable(Identifier("$tmp$_1"))),
+          List(
+            LMonIf.AssignStmt(
+              Identifier("$tmp$_2"),
+              LMonIf.BinaryNumericOp(
+                BinaryNumericOperator.Add,
+                LMonIf.Constant(1),
+                LMonIf.Constant(1)
+              )
+            ),
+            LMonIf.PrintStmt(LMonIf.Variable(Identifier("$tmp$_2")))
+          ),
+          List(
+            LMonIf.AssignStmt(
+              Identifier("$tmp$_3"),
+              LMonIf.BinaryNumericOp(
+                BinaryNumericOperator.Add,
+                LMonIf.Constant(2),
+                LMonIf.Constant(2)
+              )
+            ),
+            LMonIf.PrintStmt(LMonIf.Variable(Identifier("$tmp$_3")))
+          )
+        )
+      )
+    )
   }
 
   // ───────────────────────────────────────────────────────────────

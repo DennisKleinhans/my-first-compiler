@@ -45,7 +45,7 @@ def extractAtom(expr: LMonIf.Expr): Atom = expr match
   */
 def simplifyExpr(
     exp: LIf.Expr,
-    gen: NameGenerator = NameGenerator()
+    gen: NameGenerator
 ): (List[LMonIf.AssignStmt], LMonIf.Expr) = exp match
   case LIf.Constant(n) => (Nil, Expr.AtomExpr(LMonIf.Constant(n)))
 
@@ -56,10 +56,10 @@ def simplifyExpr(
 
   case LIf.UnaryNumericOp(op, e) =>
     val (assignments, atomExpr) = simplifyExpr(e, gen)
-    val Identifier(tmp) = gen.freshName()
+    val tmpIdentifier = gen.freshName()
     val newAssignment: LMonIf.AssignStmt =
       LMonIf.AssignStmt(
-        Identifier(tmp),
+        tmpIdentifier,
         LMonIf.UnaryNumericOp(
           op,
           extractAtom(
@@ -70,15 +70,15 @@ def simplifyExpr(
     val extendedAssignments = assignments :+ newAssignment
     (
       extendedAssignments,
-      AtomExpr(LMonIf.Variable(Identifier(tmp)))
+      AtomExpr(LMonIf.Variable(tmpIdentifier))
     )
 
   case LIf.BinaryNumericOp(op, lhs, rhs) =>
     val (assignmentsLeft, atomExprLeft) = simplifyExpr(lhs, gen)
     val (assignmentsRight, atomExprRight) = simplifyExpr(rhs, gen)
-    val Identifier(tmp) = gen.freshName()
+    val tmpIdentifier = gen.freshName()
     val newAssignment: LMonIf.AssignStmt = LMonIf.AssignStmt(
-      Identifier(tmp),
+      tmpIdentifier,
       LMonIf.BinaryNumericOp(
         op,
         extractAtom(atomExprLeft),
@@ -89,15 +89,15 @@ def simplifyExpr(
       assignmentsLeft ++ assignmentsRight :+ newAssignment
     (
       extendedAssignments,
-      AtomExpr(LMonIf.Variable(Identifier(tmp)))
+      AtomExpr(LMonIf.Variable(tmpIdentifier))
     )
 
-  case LIf.Compare(cmp, e1, e2) => 
+  case LIf.Compare(cmp, e1, e2) =>
     val (assignmentsE1, atomExprE1) = simplifyExpr(e1, gen)
     val (assignmentsE2, atomExprE2) = simplifyExpr(e2, gen)
-    val Identifier(tmp) = gen.freshName()
+    val tmpIdentifier = gen.freshName()
     val newAssignment: LMonIf.AssignStmt = LMonIf.AssignStmt(
-      Identifier(tmp),
+      tmpIdentifier,
       LMonIf.Compare(
         cmp,
         extractAtom(atomExprE1),
@@ -108,22 +108,36 @@ def simplifyExpr(
       assignmentsE1 ++ assignmentsE2 :+ newAssignment
     (
       extendedAssignments,
-      AtomExpr(LMonIf.Variable(Identifier(tmp)))
+      AtomExpr(LMonIf.Variable(tmpIdentifier))
     )
 
-  case LIf.UnaryLogicOp(op, e) => ???
+  case LIf.UnaryLogicOp(op, e) =>
+    val (assignments, simplifiedExpr) = simplifyExpr(e, gen)
+    (assignments, LMonIf.UnaryLogicOp(op, simplifiedExpr))
 
-  case LIf.IfExpr(test, thn, els) => ???
+  case LIf.IfExpr(test, thn, els) =>
+    val (condAssignments, simpleCondExpr) = simplifyExpr(test, gen)
+    val (thenAssignments, simpleThenExpr) = simplifyExpr(thn, gen)
+    val (elseAssignments, simpleElseExpr) = simplifyExpr(els, gen)
+
+    val thenBegin = LMonIf.Begin(thenAssignments, simpleThenExpr)
+    val elseBegin = LMonIf.Begin(elseAssignments, simpleElseExpr)
+    val finalIfExpr = LMonIf.IfExpr(
+      simpleCondExpr,
+      thenBegin,
+      elseBegin
+    )
+    (condAssignments, finalIfExpr)
 
   case LIf.ReadIntCall =>
-    val Identifier(tmp) = gen.freshName()
+    val tmpIdentifier = gen.freshName()
     val newAssignment: LMonIf.AssignStmt = LMonIf.AssignStmt(
-      Identifier(tmp),
+      tmpIdentifier,
       LMonIf.ReadIntCall
     )
     (
       List(newAssignment),
-      AtomExpr(LMonIf.Variable(Identifier(tmp)))
+      AtomExpr(LMonIf.Variable(tmpIdentifier))
     )
 
   case LIf.BinaryLogicOp(_, _, _) =>
@@ -145,7 +159,7 @@ def simplifyExpr(
     */
 def simplifyStmt(
     stmt: LIf.Stmt,
-    gen: NameGenerator = NameGenerator()
+    gen: NameGenerator
 ): List[LMonIf.Stmt] =
   stmt match
     case LIf.ExprStmt(e) =>
@@ -160,7 +174,16 @@ def simplifyStmt(
       val (assignments, expr) = simplifyExpr(e, gen)
       assignments :+ LMonIf.AssignStmt(Identifier(name), expr)
 
-    case LIf.IfStmt(test, thn, els) => ???
+    case LIf.IfStmt(test, thn, els) =>
+      val (condAssignments, simpleCondExpr) = simplifyExpr(test, gen)
+      val simplifiedThenStmts = thn.flatMap(simplifyStmt(_, gen))
+      val simplifiedElseStmts = els.flatMap(simplifyStmt(_, gen))
+
+      condAssignments :+ LMonIf.IfStmt(
+        simpleCondExpr,
+        simplifiedThenStmts,
+        simplifiedElseStmts
+      )
 
     /** Simplifies all statements in a module by flattening expressions
       * throughout.
