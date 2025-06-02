@@ -149,6 +149,11 @@ object LMonIf {
 object CIf {
   import CommonNodes.*
   import CommonNodes.Atom
+  export Tail.*
+  export Expr.*
+  export Stmt.*
+
+  type Label = String
 
   /** An expression in CIf can be a atom (Long, Boolean or Variable), a unary
     * numeric operation, a binary numeric operation, a function call with the
@@ -176,7 +181,11 @@ object CIf {
   enum Tail:
     case Return(e: Expr)
     case Goto(lable: String) // could also be an Identifier instat of String
-    case If(cmp: Expr.Compare, thenGoto: Goto, elseGoto: Goto)
+    case If(cmp: Expr.Compare, thenGoto: Tail.Goto, elseGoto: Tail.Goto)
+
+  /** A basic block in CIf consists of a list of statements and a tail.
+    */
+  case class BasicBlock(stmts: List[Stmt], tail: Tail)
 
   /** A C program in CIf represents a collection of blocks, where each block is
     * identified by a unique name (String) and contains a list of statements and
@@ -185,7 +194,7 @@ object CIf {
     * @param blocks
     */
   case class CProgram(
-      blocks: Map[String, (List[Stmt], Tail)]
+      blocks: Map[Label, BasicBlock]
   ) // also here we could use Identifier instead of String
 
 }
