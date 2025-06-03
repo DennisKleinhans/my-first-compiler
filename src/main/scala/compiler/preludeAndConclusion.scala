@@ -6,20 +6,30 @@ import x86.Instr.*
 import x86.Immediate
 
 def preludeAndConclusion(
-    instrs: List[x86.Instr],
+    program: x86.Program,
     stackSpace: Int
-): List[x86.Instr] =
+): x86.Program =
+  val x86.Program(blocks) = program
   val alignedSpace = ((stackSpace + 15) / 16) * 16
 
-  val prolog = List(
-    PushQ(Reg.Rbp),
-    MovQ(Reg.Rsp, Reg.Rbp),
-    SubQ(Immediate(alignedSpace), Reg.Rsp)
-  )
-  val epilog = List(
+  val mainBlock = List(PushQ(Reg.Rbp)) ++
+    List(
+      MovQ(Reg.Rsp, Reg.Rbp),
+      MovQ(Reg.Rsp, Reg.Rbp),
+      SubQ(Immediate(alignedSpace), Reg.Rsp),
+      Jmp("start")
+    )
+
+  val conclusionBlock = List(
     AddQ(Immediate(alignedSpace), Reg.Rsp),
     PopQ(Reg.Rbp),
     MovQ(Immediate(0), Reg.Rax),
     RetQ
   )
-  prolog ++ instrs ++ epilog
+
+  val updatedBlocks = blocks ++ Map(
+    "main" -> mainBlock,
+    "conclusion" -> conclusionBlock
+  )
+
+  x86.Program(updatedBlocks)

@@ -9,6 +9,8 @@ import CommonNodes.Atom.*
 import LIntInterpreter.*
 import munit.Tag
 import java.util.jar.Attributes.Name
+import compiler.x86VarIf.Instr
+import x86.Reg
 
 // ───────────────────────────────────────────────────────────────
 // ─── S-Expression Fixtures ─────────────────────────────────────
@@ -405,16 +407,27 @@ class selectInstructionsTests extends FunSuite {
   test("selectInstructions - simple Add (1+2)") {
     val programm = "1+2"
     val result = selectInstructions(
-      simplifyModule(
-        LIfReader.fromSExpToModule((parse(programm)))
+      explicateControl(
+        simplifyModule(
+          LIfReader.fromSExpToModule((parse(programm)))
+        )
       )
     )
-    val expected = List(
-      x86VarIf
-        .MovQ(x86VarIf.Immediate(1), x86VarIf.Variable(Identifier("$tmp$_1"))),
-      x86VarIf.AddQ(
-        x86VarIf.Immediate(2),
-        x86VarIf.Variable(Identifier("$tmp$_1"))
+    val expected = x86VarIf.Program(
+      Map(
+        "start" -> List(
+          x86VarIf
+            .MovQ(
+              x86VarIf.Immediate(1),
+              x86VarIf.Variable(Identifier("$tmp$_1"))
+            ),
+          x86VarIf.AddQ(
+            x86VarIf.Immediate(2),
+            x86VarIf.Variable(Identifier("$tmp$_1"))
+          ),
+          x86VarIf.MovQ(x86VarIf.Immediate(0L), Reg.Rax),
+          x86VarIf.Jmp("conclusion")
+        )
       )
     )
     assertEquals(result, expected)
@@ -423,50 +436,78 @@ class selectInstructionsTests extends FunSuite {
   test("selectInstructions - read_int()") {
     val programm = "1 + read_int()"
     val result = selectInstructions(
-      simplifyModule(
-        LIfReader.fromSExpToModule((parse(programm)))
+      explicateControl(
+        simplifyModule(
+          LIfReader.fromSExpToModule((parse(programm)))
+        )
       )
     )
-    val expected = List(
-      x86VarIf.CallQ("read_int", 0),
-      x86VarIf.MovQ(
-        x86.Reg.Rax,
-        x86VarIf.Variable(Identifier("$tmp$_1"))
-      ),
-      x86VarIf
-        .MovQ(x86VarIf.Immediate(1), x86VarIf.Variable(Identifier("$tmp$_2"))),
-      x86VarIf.AddQ(
-        x86VarIf.Variable(Identifier("$tmp$_1")),
-        x86VarIf.Variable(Identifier("$tmp$_2"))
+    val expected = x86VarIf.Program(
+      Map(
+        "start" -> List(
+          x86VarIf.CallQ("read_int", 0),
+          x86VarIf.MovQ(
+            x86.Reg.Rax,
+            x86VarIf.Variable(Identifier("$tmp$_1"))
+          ),
+          x86VarIf
+            .MovQ(
+              x86VarIf.Immediate(1),
+              x86VarIf.Variable(Identifier("$tmp$_2"))
+            ),
+          x86VarIf.AddQ(
+            x86VarIf.Variable(Identifier("$tmp$_1")),
+            x86VarIf.Variable(Identifier("$tmp$_2"))
+          ),
+          x86VarIf.MovQ(x86VarIf.Immediate(0L), Reg.Rax),
+          x86VarIf.Jmp("conclusion")
+        )
       )
     )
   }
 
   test("selectInstructions - complex arithmetic") {
     val programm = "1+(3+4)-8"
-    val expected = List(
-      x86VarIf
-        .MovQ(x86VarIf.Immediate(3), x86VarIf.Variable(Identifier("$tmp$_1"))),
-      x86VarIf
-        .AddQ(x86VarIf.Immediate(4), x86VarIf.Variable(Identifier("$tmp$_1"))),
-      x86VarIf
-        .MovQ(x86VarIf.Immediate(1), x86VarIf.Variable(Identifier("$tmp$_2"))),
-      x86VarIf.AddQ(
-        x86VarIf.Variable(Identifier("$tmp$_1")),
-        x86VarIf.Variable(Identifier("$tmp$_2"))
-      ),
-      x86VarIf.MovQ(
-        x86VarIf.Variable(Identifier("$tmp$_2")),
-        x86VarIf.Variable(Identifier("$tmp$_3"))
-      ),
-      x86VarIf.SubQ(
-        x86VarIf.Immediate(8),
-        x86VarIf.Variable(Identifier("$tmp$_3"))
+    val expected = x86VarIf.Program(
+      Map(
+        "start" -> List(
+          x86VarIf
+            .MovQ(
+              x86VarIf.Immediate(3),
+              x86VarIf.Variable(Identifier("$tmp$_1"))
+            ),
+          x86VarIf
+            .AddQ(
+              x86VarIf.Immediate(4),
+              x86VarIf.Variable(Identifier("$tmp$_1"))
+            ),
+          x86VarIf
+            .MovQ(
+              x86VarIf.Immediate(1),
+              x86VarIf.Variable(Identifier("$tmp$_2"))
+            ),
+          x86VarIf.AddQ(
+            x86VarIf.Variable(Identifier("$tmp$_1")),
+            x86VarIf.Variable(Identifier("$tmp$_2"))
+          ),
+          x86VarIf.MovQ(
+            x86VarIf.Variable(Identifier("$tmp$_2")),
+            x86VarIf.Variable(Identifier("$tmp$_3"))
+          ),
+          x86VarIf.SubQ(
+            x86VarIf.Immediate(8),
+            x86VarIf.Variable(Identifier("$tmp$_3"))
+          ),
+          x86VarIf.MovQ(x86VarIf.Immediate(0L), Reg.Rax),
+          x86VarIf.Jmp("conclusion")
+        )
       )
     )
     val result = selectInstructions(
-      simplifyModule(
-        LIfReader.fromSExpToModule(parse(programm))
+      explicateControl(
+        simplifyModule(
+          LIfReader.fromSExpToModule(parse(programm))
+        )
       )
     )
     assertEquals(result, expected)

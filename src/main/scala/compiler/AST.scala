@@ -214,6 +214,8 @@ object x86VarIf {
   import CommonNodes.Identifier
   export Instr.*
 
+  case class Program(blocks: Map[String, List[x86VarIf.Instr]])
+
   /*
    * An identifier in x86VarIf represents a variable name or label.
    * It is used to refer to variables in the x86VarIf instructions.
