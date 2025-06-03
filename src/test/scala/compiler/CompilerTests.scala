@@ -4,65 +4,64 @@ import munit.FunSuite
 import lang.SExp
 import lang.SExp.*
 import lang.parse
-import compiler.CommonNodes.*
-
-import compiler.{LIntInterpreter}
+import CommonNodes.*
+import CommonNodes.Atom.*
+import LIntInterpreter.*
 import munit.Tag
 import java.util.jar.Attributes.Name
 
-class CompilerTests extends FunSuite {
+// ───────────────────────────────────────────────────────────────
+// ─── S-Expression Fixtures ─────────────────────────────────────
+// ───────────────────────────────────────────────────────────────
 
+val sexpOnePlusOne = Node(
+  List(
+    Symbol("Binary"),
+    Symbol("Add"),
+    Node(List(Symbol("Constant"), Number(1))),
+    Node(List(Symbol("Constant"), Number(1)))
+  )
+)
+
+val sexpFourMinusTwo = Node(
+  List(
+    Symbol("Binary"),
+    Symbol("Sub"),
+    Node(List(Symbol("Constant"), Number(4))),
+    Node(List(Symbol("Constant"), Number(2)))
+  )
+)
+
+val sexpMinusEight = Node(
+  List(
+    Symbol("Unary"),
+    Symbol("Neg"),
+    Node(List(Symbol("Constant"), Number(8)))
+  )
+)
+
+val sexpInputIntCall = Node(
+  List(
+    Symbol("Call"),
+    Node(List(Symbol("Variable"), Symbol("read_int"))),
+    Node(Nil)
+  )
+)
+
+val onePlusOneAst =
+  LIf.BinaryNumericOp(
+    BinaryNumericOperator.Add,
+    LIf.Constant(1),
+    LIf.Constant(1)
+  )
+
+class ParserTests extends FunSuite {
   // ───────────────────────────────────────────────────────────────
   // ─── Basic Sanity Check ────────────────────────────────────────
   // ───────────────────────────────────────────────────────────────
   test("1 + 1 = 2") {
     assertEquals(1 + 1, 2)
   }
-
-  // ───────────────────────────────────────────────────────────────
-  // ─── S-Expression Fixtures ─────────────────────────────────────
-  // ───────────────────────────────────────────────────────────────
-
-  val sexpOnePlusOne = Node(
-    List(
-      Symbol("Binary"),
-      Symbol("Add"),
-      Node(List(Symbol("Constant"), Number(1))),
-      Node(List(Symbol("Constant"), Number(1)))
-    )
-  )
-
-  val sexpFourMinusTwo = Node(
-    List(
-      Symbol("Binary"),
-      Symbol("Sub"),
-      Node(List(Symbol("Constant"), Number(4))),
-      Node(List(Symbol("Constant"), Number(2)))
-    )
-  )
-
-  val sexpMinusEight = Node(
-    List(
-      Symbol("Unary"),
-      Symbol("Neg"),
-      Node(List(Symbol("Constant"), Number(8)))
-    )
-  )
-
-  val sexpInputIntCall = Node(
-    List(
-      Symbol("Call"),
-      Node(List(Symbol("Variable"), Symbol("read_int"))),
-      Node(Nil)
-    )
-  )
-
-  val onePlusOneAst =
-    LIf.BinaryNumericOp(
-      BinaryNumericOperator.Add,
-      LIf.Constant(1),
-      LIf.Constant(1)
-    )
 
   // ───────────────────────────────────────────────────────────────
   // ─── Expression Tests ─────────────────────────────────────────
@@ -165,10 +164,9 @@ class CompilerTests extends FunSuite {
       )
     )
   }
+}
 
-  // ───────────────────────────────────────────────────────────────
-  // ─── LIntInterpreter Tests ─────────────────────────────────────
-  // ───────────────────────────────────────────────────────────────
+class LIntInterpreterTests extends FunSuite {
 
   test("LIntInterpreter.evalExpr - binary: 1 + 1") {
     assertEquals(
@@ -264,7 +262,9 @@ class CompilerTests extends FunSuite {
     val expected = LIf.PrintStmt(LIf.Constant(2))
     assertEquals(LIntInterpreter.partialEvalStatement(input), expected)
   }
+}
 
+class RemoveComplexOperandsTests extends FunSuite {
   // ───────────────────────────────────────────────────────────────
   // ─── LMonVar Tests ─────────────────────────────────────────────
   // ───────────────────────────────────────────────────────────────
@@ -281,29 +281,29 @@ class CompilerTests extends FunSuite {
           Identifier("$tmp$_1"),
           LMonIf.BinaryNumericOp(
             BinaryNumericOperator.Add,
-            LMonIf.Constant(2),
-            LMonIf.Constant(2)
+            Atom.Constant(2),
+            Atom.Constant(2)
           )
         ),
         LMonIf.AssignStmt(
           Identifier("$tmp$_2"),
           LMonIf.BinaryNumericOp(
             BinaryNumericOperator.Add,
-            LMonIf.Constant(1),
-            LMonIf.Variable(Identifier("$tmp$_1"))
+            Atom.Constant(1),
+            Atom.Variable(Identifier("$tmp$_1"))
           )
         ),
         LMonIf.AssignStmt(
           Identifier("$tmp$_3"),
           LMonIf.BinaryNumericOp(
             BinaryNumericOperator.Sub,
-            LMonIf.Variable(Identifier("$tmp$_2")),
-            LMonIf.Constant(8)
+            Atom.Variable(Identifier("$tmp$_2")),
+            Atom.Constant(8)
           )
         ),
         LMonIf.ExprStmt(
           LMonIf.AtomExpr(
-            LMonIf.Variable(Identifier("$tmp$_3"))
+            Atom.Variable(Identifier("$tmp$_3"))
           )
         )
       )
@@ -323,23 +323,23 @@ class CompilerTests extends FunSuite {
         LMonIf.AssignStmt(
           Identifier("$tmp$_1"),
           LMonIf
-            .Compare(CompareOperator.Eq, LMonIf.Constant(1), LMonIf.Constant(1))
+            .Compare(CompareOperator.Eq, Atom.Constant(1), Atom.Constant(1))
         ),
         LMonIf.ExprStmt(
           LMonIf.IfExpr(
-            LMonIf.AtomExpr(LMonIf.Variable(Identifier("$tmp$_1"))),
+            LMonIf.AtomExpr(Atom.Variable(Identifier("$tmp$_1"))),
             LMonIf.Begin(
               List(
                 LMonIf.AssignStmt(
                   Identifier("$tmp$_2"),
                   LMonIf.BinaryNumericOp(
                     BinaryNumericOperator.Add,
-                    LMonIf.Constant(1),
-                    LMonIf.Constant(1)
+                    Atom.Constant(1),
+                    Atom.Constant(1)
                   )
                 )
               ),
-              LMonIf.AtomExpr(LMonIf.Variable(Identifier("$tmp$_2")))
+              LMonIf.AtomExpr(Atom.Variable(Identifier("$tmp$_2")))
             ),
             LMonIf.Begin(
               List(
@@ -347,12 +347,12 @@ class CompilerTests extends FunSuite {
                   Identifier("$tmp$_3"),
                   LMonIf.BinaryNumericOp(
                     BinaryNumericOperator.Add,
-                    LMonIf.Constant(2),
-                    LMonIf.Constant(2)
+                    Atom.Constant(2),
+                    Atom.Constant(2)
                   )
                 )
               ),
-              LMonIf.AtomExpr(LMonIf.Variable(Identifier("$tmp$_3")))
+              LMonIf.AtomExpr(Atom.Variable(Identifier("$tmp$_3")))
             )
           )
         )
@@ -369,41 +369,39 @@ class CompilerTests extends FunSuite {
         LMonIf.AssignStmt(
           Identifier("$tmp$_1"),
           LMonIf
-            .Compare(CompareOperator.Eq, LMonIf.Constant(1), LMonIf.Constant(1))
+            .Compare(CompareOperator.Eq, Atom.Constant(1), Atom.Constant(1))
         ),
         LMonIf.IfStmt(
-          LMonIf.AtomExpr(LMonIf.Variable(Identifier("$tmp$_1"))),
+          LMonIf.AtomExpr(Atom.Variable(Identifier("$tmp$_1"))),
           List(
             LMonIf.AssignStmt(
               Identifier("$tmp$_2"),
               LMonIf.BinaryNumericOp(
                 BinaryNumericOperator.Add,
-                LMonIf.Constant(1),
-                LMonIf.Constant(1)
+                Atom.Constant(1),
+                Atom.Constant(1)
               )
             ),
-            LMonIf.PrintStmt(LMonIf.Variable(Identifier("$tmp$_2")))
+            LMonIf.PrintStmt(Atom.Variable(Identifier("$tmp$_2")))
           ),
           List(
             LMonIf.AssignStmt(
               Identifier("$tmp$_3"),
               LMonIf.BinaryNumericOp(
                 BinaryNumericOperator.Add,
-                LMonIf.Constant(2),
-                LMonIf.Constant(2)
+                Atom.Constant(2),
+                Atom.Constant(2)
               )
             ),
-            LMonIf.PrintStmt(LMonIf.Variable(Identifier("$tmp$_3")))
+            LMonIf.PrintStmt(Atom.Variable(Identifier("$tmp$_3")))
           )
         )
       )
     )
   }
+}
 
-  // ───────────────────────────────────────────────────────────────
-  // ─── selectInstructions Tests───────────────────────────────────
-  // ───────────────────────────────────────────────────────────────
-
+class selectInstructionsTests extends FunSuite {
   test("selectInstructions - simple Add (1+2)") {
     val programm = "1+2"
     val result = selectInstructions(
@@ -473,11 +471,9 @@ class CompilerTests extends FunSuite {
     )
     assertEquals(result, expected)
   }
+}
 
-  // ───────────────────────────────────────────────────────────────
-  // ─── shrink Tests ──────────────────────────────────────────────
-  // ───────────────────────────────────────────────────────────────
-
+class ShrinkTests extends FunSuite {
   val andExpr = LIf.BinaryLogicOp(
     BinaryLogicOperator.And,
     LIf.Constant(1),
@@ -543,11 +539,9 @@ class CompilerTests extends FunSuite {
     )
     assertEquals(shrinkModule(input), expected)
   }
+}
 
-  // ───────────────────────────────────────────────────────────────
-  // ─── End-to-End Tests ──────────────────────────────────────────
-  // ───────────────────────────────────────────────────────────────
-
+class EndToEndTests extends FunSuite {
   test("End-to-End: object language -> AST - print(1 + 1)") {
     val printCall = "print(1+1)"
 

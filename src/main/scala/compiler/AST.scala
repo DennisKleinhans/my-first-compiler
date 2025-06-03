@@ -1,5 +1,7 @@
 package compiler
 
+import scala.compiletime.ops.long
+
 object CommonNodes {
 
   /** An atom in can be a constant value (Long or Boolean) or a variable
@@ -103,7 +105,6 @@ object LMonIf {
   import CommonNodes.Atom
   export Expr.*
   export Stmt.*
-  export Atom.*
 
   /** A module is the top-level program structure in LMonIf.
     *
@@ -127,6 +128,8 @@ object LMonIf {
     * accept atoms.
     */
   enum Expr:
+    case Constant(n: Long)
+    case ConstantBool(b: Boolean)
     case UnaryNumericOp(op: UnaryNumericOperator, a: Atom)
     case UnaryLogicOp(op: UnaryLogicOperator, e: Expr)
     case BinaryNumericOp(op: BinaryNumericOperator, lhs: Atom, rhs: Atom)
@@ -161,6 +164,8 @@ object CIf {
     * restiction to only accept atoms.
     */
   enum Expr:
+    case Constant(n: Long)
+    case ConstantBool(b: Boolean)
     case AtomExpr(a: Atom)
     case UnaryNumericOp(op: UnaryNumericOperator, a: Atom)
     case BinaryNumericOp(op: BinaryNumericOperator, lhs: Atom, rhs: Atom)

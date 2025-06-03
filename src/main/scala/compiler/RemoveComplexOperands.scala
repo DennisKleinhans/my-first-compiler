@@ -47,12 +47,12 @@ def simplifyExpr(
     exp: LIf.Expr,
     gen: NameGenerator
 ): (List[LMonIf.AssignStmt], LMonIf.Expr) = exp match
-  case LIf.Constant(n) => (Nil, Expr.AtomExpr(LMonIf.Constant(n)))
+  case LIf.Constant(n) => (Nil, Expr.AtomExpr(Atom.Constant(n)))
 
-  case LIf.ConstantBool(b) => (Nil, Expr.AtomExpr(LMonIf.ConstantBool(b)))
+  case LIf.ConstantBool(b) => (Nil, Expr.AtomExpr(Atom.ConstantBool(b)))
 
   case LIf.Variable(Identifier(name)) =>
-    (Nil, AtomExpr(LMonIf.Variable(Identifier(name))))
+    (Nil, AtomExpr(Atom.Variable(Identifier(name))))
 
   case LIf.UnaryNumericOp(op, e) =>
     val (assignments, atomExpr) = simplifyExpr(e, gen)
@@ -70,7 +70,7 @@ def simplifyExpr(
     val extendedAssignments = assignments :+ newAssignment
     (
       extendedAssignments,
-      AtomExpr(LMonIf.Variable(tmpIdentifier))
+      AtomExpr(Atom.Variable(tmpIdentifier))
     )
 
   case LIf.BinaryNumericOp(op, lhs, rhs) =>
@@ -89,7 +89,7 @@ def simplifyExpr(
       assignmentsLeft ++ assignmentsRight :+ newAssignment
     (
       extendedAssignments,
-      AtomExpr(LMonIf.Variable(tmpIdentifier))
+      AtomExpr(Atom.Variable(tmpIdentifier))
     )
 
   case LIf.Compare(cmp, e1, e2) =>
@@ -108,7 +108,7 @@ def simplifyExpr(
       assignmentsE1 ++ assignmentsE2 :+ newAssignment
     (
       extendedAssignments,
-      AtomExpr(LMonIf.Variable(tmpIdentifier))
+      AtomExpr(Atom.Variable(tmpIdentifier))
     )
 
   case LIf.UnaryLogicOp(op, e) =>
@@ -137,7 +137,7 @@ def simplifyExpr(
     )
     (
       List(newAssignment),
-      AtomExpr(LMonIf.Variable(tmpIdentifier))
+      AtomExpr(Atom.Variable(tmpIdentifier))
     )
 
   case LIf.BinaryLogicOp(_, _, _) =>
