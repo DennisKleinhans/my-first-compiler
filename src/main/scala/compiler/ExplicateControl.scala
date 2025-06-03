@@ -5,19 +5,75 @@ import compiler.LMonIf.Expr
 import CommonNodes.*
 import CommonNodes.Atom.*
 
+/** Utility object to generate unique labels for newly created BasicBlocks.
+  *
+  * @note
+  *   Each call to `freshLabel` returns a string of the form `nameN`, where `N`
+  *   is a monotonically increasing integer. This ensures that every label is
+  *   distinct across the entire translation.
+  */
 object LabelGenerator {
   private var counter = 0
 
+  /** Produce a fresh, unique label string by appending a global counter to the
+    * given base name.
+    *
+    * @param name
+    *   A prefix for the label (e.g. "block", "cmpAssign", "pred", etc.).
+    *   Defaults to "block".
+    * @return
+    *   A new label of the form `nameN` where `N` is the next unused integer.
+    */
   def freshLabel(name: String = "block"): CIf.Label =
     counter += 1
     name + counter
 }
 
-// compile the expr expression, with the result being assigned to id, sequence with continuation
-// 1. create a block for the continuation
-// 2. compile then-branch with explicate_assign
-// 3. compile else-branch with explicate_assign
-// 4. compile the condition with explicate_pred, passing in the two branches
+/** Translate a LMonIf expression into one or more CIf BasicBlocks that assign
+  * its value into a given temporary variable, then jump to the provided
+  * continuation block.
+  *
+  * In detail:
+  *   - If `expr` is an `IfExpr(cond, thenExpr, elseExpr)`, we
+  *     1. create a fresh continuation label that points to the given
+  *        continuation block, 2. recursively translate `thenExpr` and
+  *        `elseExpr` into BasicBlocks, each ending with a `Goto(contLabel)`, 3.
+  *        generate a “test” block by calling `explicatePred(cond, thenBlock,
+  *        elseBlock, basicBlocks)`.
+  *
+  *   - If `expr` is a `Begin(stmts, innerExpr)`, we
+  *     1. recursively translate `innerExpr` (its result is stored into `id` and
+  *        jumps to `continuation`), 2. fold the `stmts` list right-to-left,
+  *        using each statement’s translation (`explicateStmt`) to chain into
+  *        the block returned for `innerExpr`.
+  *
+  *   - Otherwise (i.e. `expr` is one of: `AtomExpr`, `ReadIntCall`,
+  *     `UnaryNumericOp`, `BinaryNumericOp`, `Compare`), we generate exactly one
+  *     BasicBlock that performs `id := <converted expr>` and then jumps to
+  *     `continuation`. The `convertExprToCIf` helper is used to convert a
+  *     LMonIf expression into the corresponding CIf expression form.
+  *
+  * Each newly created BasicBlock is prepended with the existing statements of
+  * `continuation` (via `continuation.stmts`) so that any sequencing of simple
+  * statements is preserved. We never drop those previously created statements;
+  * instead, we append the new assignment at the front and keep the tail intact.
+  *
+  * @param expr
+  *   The LMonIf expression to evaluate and store into `id`.
+  * @param id
+  *   The Identifier of the temporary variable where the result will be stored.
+  * @param continuation
+  *   A CIf.BasicBlock representing “what comes next” after this expression’s
+  *   value is assigned. Its `.stmts` are appended after this assignment, and
+  *   its `.tail` is used for the Goto in the new block.
+  * @param basicBlocks
+  *   A mutable map from label → CIf.BasicBlock, which is populated whenever a
+  *   new block is created. Any BasicBlock returned by this function must
+  *   already be inserted into `basicBlocks` under a fresh label.
+  * @return
+  *   The newly created CIf.BasicBlock (with its assignment prepended onto
+  *   `continuation.stmts`).
+  */
 def explicateAssign(
     expr: LMonIf.Expr,
     id: Identifier,
@@ -26,9 +82,11 @@ def explicateAssign(
 ): CIf.BasicBlock = {
   expr match {
     case LMonIf.IfExpr(cond, thn, els) =>
+      // 1. Create a new label for the continuation block and insert it into basicBlocks
       val contLabel = LabelGenerator.freshLabel()
       basicBlocks(contLabel) = continuation
 
+      // 2. Translate the “then” branch so that it computes into `id` and then jumps to contLabel
       val thenBlock = explicateAssign(
         thn,
         id,
@@ -36,6 +94,7 @@ def explicateAssign(
         basicBlocks
       )
 
+      // 3. Translate the “else” branch similarly
       val elseBlock = explicateAssign(
         els,
         id,
@@ -43,23 +102,76 @@ def explicateAssign(
         basicBlocks
       )
 
+      // 4. Generate a predicate block that tests `cond` to jump to either thenBlock or elseBlock
       explicatePred(cond, thenBlock, elseBlock, basicBlocks)
 
     case LMonIf.Begin(stmts, expr) =>
+      // 1. Recursively translate the final expression, which will store its result into `id` and end with a Goto(continuation).
       val assignBlock = explicateAssign(expr, id, continuation, basicBlocks)
+
+      // 2. Fold all preceding statements in reverse order so that each Stmt’s translation chains into the block returned for innerExpr.
       stmts.foldRight(assignBlock) { (stmt, cont) =>
         explicateStmt(stmt, cont, basicBlocks)
       }
 
     case _ =>
+      // Simple expressions (AtomExpr, ReadIntCall, UnaryNumericOp, BinaryNumericOp, Compare).
+      // Generate exactly one BasicBlock to assign `id := <converted expr>` and then use continuation.tail.
       val assignStmt = CIf.AssignStmt(id, convertExprToCIf(expr))
-      CIf.BasicBlock(List(assignStmt), continuation.tail)
+      CIf.BasicBlock(assignStmt :: continuation.stmts, continuation.tail)
   }
 }
 
-// compile the condition expression, jumping to thn if true and els if not
-// 1. create blocks for the branches
-// 2. generate an "if" statement with jumps to the two new blocks
+/** Translate a LMonIf expression used as a boolean predicate into a CIf
+  * BasicBlock that jumps to `thn` if the predicate is `true`, or to `els` if
+  * `false`.
+  *
+  * In detail:
+  *   - If `condition` is a `Compare(cmp, e1, e2)`, we create fresh labels for
+  *     the “then” and “else” targets, insert `thn` and `els` into `basicBlocks`
+  *     under those labels, return a BasicBlock whose tail is `If(cmp,
+  *     Goto(thenLabel), Goto(elseLabel))`.
+  *
+  *   - If `condition` is `UnaryLogicOp(Not, inner)`, we simply swap the
+  *     `thn`/`els` branches and recurse on `inner`.
+  *
+  *   - If `condition` is an `IfExpr(cond2, thenExpr, elseExpr)`, we first
+  *     recursively generate predicate blocks for `thenExpr` and `elseExpr` with
+  *     the same `thn`/`els` continuations, then recursively generate a block
+  *     for `cond2` that jumps to those inner predicate-result blocks.
+  *
+  *   - If `condition` is `Begin(stmts, innerExpr)`, we first translate all
+  *     side-effecting statements `stmts` into a chain of BasicBlocks that lead
+  *     into the predicate block generated for `innerExpr`.
+  *
+  *   - If `condition` is `AtomExpr(v)` where `v` is a boolean variable, we
+  *     rewrite it as `Compare(Eq, v, ConstantBool(true))` and call ourselves on
+  *     that Compare. This turns a bare boolean variable test into an explicit
+  *     equality‐to‐true comparison. The resulting block ends with `If(v ==
+  *     true, thenLabel, elseLabel)`.
+  *
+  *   - If `condition` is `AtomExpr(ConstantBool(true))` or
+  *     `ConstantBool(false)`, we return `thn` or `els` directly (no new block
+  *     is needed, because the result is constant).
+  *
+  * Any other form (e.g., arithmetic or non‐boolean Atoms) is invalid for a
+  * predicate and raises an error.
+  *
+  * @param condition
+  *   The LMonIf expression to treat as a boolean test.
+  * @param thn
+  *   A CIf.BasicBlock that must be jumped to if `condition` evaluates to true.
+  * @param els
+  *   A CIf.BasicBlock that must be jumped to if `condition` evaluates to false.
+  * @param basicBlocks
+  *   A mutable map of all BasicBlocks so far; any newly generated BasicBlock
+  *   (e.g. a Compare‐If block) must be stored here under a fresh label before
+  *   returning.
+  * @return
+  *   The newly created predicate BasicBlock (with an `If` tail) that examines
+  *   `condition` and jumps to `thn` or `els`. If `condition` is constant
+  *   true/false, returns `thn` or `els`.
+  */
 def explicatePred(
     condition: LMonIf.Expr,
     thn: CIf.BasicBlock,
@@ -68,48 +180,85 @@ def explicatePred(
 ): CIf.BasicBlock = {
   condition match {
     case LMonIf.Compare(cmp, e1, e2) =>
+      // Generate fresh labels for the “then” and “else” targets, insert them in the map
       val thenLable = LabelGenerator.freshLabel()
       val elseLable = LabelGenerator.freshLabel()
 
       basicBlocks(thenLable) = thn
       basicBlocks(elseLable) = els
 
+      // Build an If‐tail: If(e1 cmp e2) goto thenLabel else goto elseLabel
       val compareExpr: CIf.Compare = CIf.Compare(cmp, e1, e2)
       val thenGoto: CIf.Goto = CIf.Goto(thenLable)
       val elseGoto: CIf.Goto = CIf.Goto(elseLable)
 
       CIf.BasicBlock(List.empty, CIf.If(compareExpr, thenGoto, elseGoto))
 
-    // swap the then and else branch
     case LMonIf.UnaryLogicOp(UnaryLogicOperator.Not, expr) =>
+      // Swap true/false targets and recurse
       explicatePred(expr, els, thn, basicBlocks)
 
     case LMonIf.IfExpr(condExpr, thenExpr, elseExpr) =>
-      val innerThenBlock = explicatePred(thenExpr, thn, els, basicBlocks)
-      val innerElseBlock = explicatePred(elseExpr, thn, els, basicBlocks)
-      explicatePred(condExpr, innerThenBlock, innerElseBlock, basicBlocks)
+      // First create predicate blocks for the then/else expressions themselves
+      val thenPredBlock = explicatePred(thenExpr, thn, els, basicBlocks)
+      val elsePredBlock = explicatePred(elseExpr, thn, els, basicBlocks)
 
-    // TODO: what happens if atom is not a boolean? Should it be allowed to interpret a number as a boolean e.g. 0 = false else true?
-    case LMonIf.AtomExpr(atom) =>
-      val compareExpr: CIf.Compare =
-        CIf.Compare(CompareOperator.Eq, atom, ConstantBool(true))
-      val thenLabel = LabelGenerator.freshLabel()
-      val elseLabel = LabelGenerator.freshLabel()
+      // Now test cond to branch to either thenPredBlock or elsePredBlock
+      explicatePred(condExpr, thenPredBlock, elsePredBlock, basicBlocks)
 
-      basicBlocks(thenLabel) = thn
-      basicBlocks(elseLabel) = els
+    case LMonIf.Begin(stmts, expr) =>
+      // Translate all side‐effecting statements, then feed into the predicate for innerExpr
+      val condBlock = explicatePred(expr, thn, els, basicBlocks)
+      stmts.foldRight(condBlock) { (stmt, cont) =>
+        explicateStmt(stmt, cont, basicBlocks)
+      }
 
-      CIf.BasicBlock(
-        List.empty,
-        CIf.If(compareExpr, CIf.Goto(thenLabel), CIf.Goto(elseLabel))
-      )
+    case LMonIf.AtomExpr(v @ Variable(_)) =>
+      // A bare boolean variable v: rewrite as Compare(v == true) and recurse
+      val boolCompare =
+        LMonIf.Compare(CompareOperator.Eq, v, ConstantBool(true))
+      explicatePred(boolCompare, thn, els, basicBlocks)
 
-    // TODO: Was passiert hier? Können überhaupt noch andere Fälle auftreten?
-    case _ => ???
+    case LMonIf.AtomExpr(ConstantBool(true)) => thn
+
+    case LMonIf.AtomExpr(ConstantBool(false)) => els
+
+    case other => sys error "cannot compare this condition: " + other
   }
 }
 
-// compile expr for its side effects, sequence with continuation
+/** Translate a LMonIf expression purely for its side‐effects, then jump to a
+  * continuation block.
+  *
+  *   - If `expr` is an `IfExpr(cond, thenExpr, elseExpr)`, we recursively
+  *     translate the `thenExpr` (only for its side‐effects, ignoring its value)
+  *     with the same continuation, recursively translate the `elseExpr` with
+  *     the same continuation, generate a predicate block via
+  *     `explicatePred(cond, thenBlock, elseBlock, basicBlocks)`.
+  *
+  *   - If `expr` is `Begin(stmts, innerExpr)`, we recursively translate
+  *     `innerExpr` for its side‐effects into a block `innerBlock`, fold‐right
+  *     all statements `stmts` so that each one’s translation chains into
+  *     `innerBlock`.
+  *
+  *   - Otherwise (e.g. `AtomExpr`, `ReadIntCall`, `UnaryNumericOp`,
+  *     `BinaryNumericOp`, `Compare`), we create one BasicBlock containing
+  *     `ExprStmt(<converted expr>)` and then a `Goto(continuation)`, since
+  *     those forms may have side‐effects (e.g. `ReadIntCall`) but no direct
+  *     value assignment.
+  *
+  * @param expr
+  *   The LMonIf expression whose side‐effects we want to preserve.
+  * @param continuation
+  *   A BasicBlock that represents “what to do next” after the side‐effects have
+  *   executed. Its `.tail` is used for the Goto in the newly created block(s).
+  * @param basicBlocks
+  *   A mutable map to hold every BasicBlock we create. Newly generated blocks
+  *   must be written here under a fresh label before returning.
+  * @return
+  *   The BasicBlock that should be executed first if we want to run `expr`’s
+  *   side‐effects and then reach `continuation`.
+  */
 def explicateEffect(
     expr: LMonIf.Expr,
     continuation: CIf.BasicBlock,
@@ -117,25 +266,62 @@ def explicateEffect(
 ): CIf.BasicBlock = {
   expr match {
     case LMonIf.IfExpr(condExpr, thenExpr, elseExpr) =>
-      // both branches only for their side effects
+      // Both branches for side-effects only
       val thenBlock = explicateEffect(thenExpr, continuation, basicBlocks)
       val elseBlock = explicateEffect(elseExpr, continuation, basicBlocks)
       explicatePred(condExpr, thenBlock, elseBlock, basicBlocks)
 
     case LMonIf.Begin(stmts, expr) =>
+      // Translate the inner expression’s side-effects, then fold all preceding statements
       val effectBlock = explicateEffect(expr, continuation, basicBlocks)
       stmts.foldRight(effectBlock) { (stmt, cont) =>
         explicateStmt(stmt, cont, basicBlocks)
       }
 
     case _ =>
-      // handle all other expressions as a statment
+      // A simple expression treated as a statement: generate one block with ExprStmt and Goto
       val stmt = CIf.ExprStmt(convertExprToCIf(expr))
       CIf.BasicBlock(List(stmt), continuation.tail)
   }
 }
 
-// compile the given statement stms, sequence with continuation
+/** Translate a single LMonIf statement into one or more CIf BasicBlocks that,
+  * upon completion, jump to the provided continuation block.
+  *
+  * Cases:
+  *   - `AssignStmt(id, expr)`: calls `explicateAssign(expr, id, continuation,
+  *     basicBlocks)`.
+  *
+  *   - `PrintStmt(atom)`: generates exactly one BasicBlock containing
+  *     `PrintStmt(atom)` and then `Goto(continuation)`.
+  *
+  *   - `ExprStmt(expr)`: calls `explicateEffect(expr, continuation,
+  *     basicBlocks)` to translate side-effects of `expr`.
+  *
+  *   - `IfStmt(cond, thenBranch, elseBranch)`: Create a fresh continuation
+  *     label for “join” and insert the given `continuation` under that label.
+  *     Fold‐right over `thenBranch` to chain all statements, ending with a
+  *     `Goto(contLabel)`. Fold‐right over `elseBranch` similarly, ending with a
+  *     `Goto(contLabel)`. Produce a predicate block with `explicatePred(cond,
+  *     thenChainEntry, elseChainEntry, basicBlocks)`.
+  *
+  * Each newly created BasicBlock is stored in `basicBlocks` under a fresh label
+  * before being returned, ensuring that all generated blocks appear in the
+  * final CIf.CProgram.
+  *
+  * @param stmt
+  *   The LMonIf.Stmt to translate.
+  * @param continuation
+  *   A BasicBlock representing “what to do next” once `stmt` has finished. Its
+  *   `.tail` is used in newly created blocks to chain control flow.
+  * @param basicBlocks
+  *   A mutable map from label → BasicBlock. Every new block must be added here
+  *   under a unique label via `LabelGenerator.freshLabel()`.
+  * @return
+  *   The CIf.BasicBlock that corresponds to the “entry” of this translated
+  *   statement. Execution should begin at this returned block in order to honor
+  *   `stmt` followed by `continuation`.
+  */
 def explicateStmt(
     stmt: LMonIf.Stmt,
     continuation: CIf.BasicBlock,
@@ -145,6 +331,7 @@ def explicateStmt(
     case LMonIf.AssignStmt(id, expr) =>
       explicateAssign(expr, id, continuation, basicBlocks)
 
+    // PrintStmt produces exactly one BasicBlock with a Print statement and then jumps to continuation
     case LMonIf.PrintStmt(atom) =>
       val printStmt = CIf.PrintStmt(atom)
       CIf.BasicBlock(List(printStmt), continuation.tail)
@@ -153,14 +340,17 @@ def explicateStmt(
       explicateEffect(expr, continuation, basicBlocks)
 
     case LMonIf.IfStmt(cond, thenBranch, elseBranch) =>
+      // 1. Create a new label for the join‐continuation and store `continuation` under it.
       val contLabel = LabelGenerator.freshLabel()
       basicBlocks(contLabel) = continuation
 
+      // 2. Build the “then” chain: each stmt in thenBranch, folded right, ending with Goto(contLabel)
       val thenBlock =
         thenBranch.foldRight(CIf.BasicBlock(List.empty, CIf.Goto(contLabel))) {
           (stmt, cont) => explicateStmt(stmt, cont, basicBlocks)
         }
 
+      // 3. Build the “else” chain similarly
       val elseBlock =
         elseBranch.foldRight(
           CIf.BasicBlock(List.empty, CIf.Goto(contLabel))
@@ -168,10 +358,34 @@ def explicateStmt(
           explicateStmt(stmt, cont, basicBlocks)
         }
 
+      // 4. Create a predicate‐block that tests `cond` and jumps to either thenBlock or elseBlock
       explicatePred(cond, thenBlock, elseBlock, basicBlocks)
   }
 }
 
+/** Helper to convert a LMonIf expression node into the corresponding CIf.Expr
+  * node.
+  *
+  * This function handles only those expression forms that directly map to CIf:
+  *   - `UnaryNumericOp` → `CIf.UnaryNumericOp`
+  *   - `BinaryNumericOp` → `CIf.BinaryNumericOp`
+  *   - `Compare` → `CIf.Compare`
+  *   - `ReadIntCall` → `CIf.ReadIntCall`
+  *   - `AtomExpr(a)` → `CIf.AtomExpr(a)`
+  *
+  * Any other form (e.g. nested `IfExpr`, `Begin`, or `UnaryLogicOp`) cannot be
+  * directly converted and triggers an error. Such forms must be handled by
+  * `explicateAssign`, `explicatePred`, or `explicateEffect` instead, which
+  * ensure that all subexpressions are in “simple” (atomic or comparison) form
+  * before calling this helper.
+  *
+  * @param expr
+  *   The LMonIf.Expr to convert.
+  * @return
+  *   The equivalent CIf.Expr node.
+  * @throws RuntimeException
+  *   if `expr` cannot be directly converted.
+  */
 def convertExprToCIf(expr: LMonIf.Expr): CIf.Expr = expr match
   case LMonIf.UnaryNumericOp(op, a)         => CIf.UnaryNumericOp(op, a)
   case LMonIf.BinaryNumericOp(op, lhs, rhs) => CIf.BinaryNumericOp(op, lhs, rhs)
@@ -180,6 +394,34 @@ def convertExprToCIf(expr: LMonIf.Expr): CIf.Expr = expr match
   case LMonIf.AtomExpr(a)                   => CIf.AtomExpr(a)
   case _ => sys error "cannot directly convert expression: " + expr
 
+/** The top‐level pass that translates an entire LMonIf.Module into a
+  * CIf.CProgram.
+  *
+  *   1. Create an initially empty mutable map `basicBlocks` to collect all
+  *      generated BasicBlocks. Fold‐right over the module’s statements, using
+  *      `foldRight(CIf.BasicBlock(Nil, Return(0))) { (stmt, cont) =>
+  *      explicateStmt(stmt, cont, basicBlocks) }` so that each top‐level
+  *      statement is translated (via `explicateStmt`) into a chain of
+  *      BasicBlocks, ultimately ending in a block whose tail is `Return(0)`.
+  *      The result of the fold (`entryBlock`) is the first block to execute for
+  *      the program. Assign the final `entryBlock` under the label `"start"` in
+  *      `basicBlocks`, marking the program entry. Return
+  *      `CIf.CProgram(basicBlocks.toMap)`, which contains every label →
+  *      BasicBlock mapping.
+  *
+  * In the resulting CIf.CProgram:
+  *   - The entry point is `"start"`.
+  *   - Every BasicBlock in the map has a list of simple CIf.Statements
+  *     (`stmts`) and a tail (`Goto`, `If`, or `Return`).
+  *   - Control flows exclusively via explicit jumps (`Goto`) or conditional
+  *     jumps (`If`).
+  *
+  * @param module
+  *   The parsed LMonIf.Module to translate.
+  * @return
+  *   The equivalent CIf.CProgram, representing the same program with explicit
+  *   control flow.
+  */
 def explicateControl(module: LMonIf.Module): CIf.CProgram = {
   val basicBlocks = mutable.Map[String, CIf.BasicBlock]()
 
