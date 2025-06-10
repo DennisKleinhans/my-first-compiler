@@ -281,7 +281,7 @@ def explicateEffect(
     case _ =>
       // A simple expression treated as a statement: generate one block with ExprStmt and Goto
       val stmt = CIf.ExprStmt(convertExprToCIf(expr))
-      CIf.BasicBlock(List(stmt), continuation.tail)
+      CIf.BasicBlock(stmt :: continuation.stmts, continuation.tail)
   }
 }
 
