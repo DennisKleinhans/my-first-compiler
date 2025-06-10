@@ -334,7 +334,7 @@ def explicateStmt(
     // PrintStmt produces exactly one BasicBlock with a Print statement and then jumps to continuation
     case LMonIf.PrintStmt(atom) =>
       val printStmt = CIf.PrintStmt(atom)
-      CIf.BasicBlock(List(printStmt), continuation.tail)
+      CIf.BasicBlock(printStmt :: continuation.stmts, continuation.tail)
 
     case LMonIf.ExprStmt(expr) =>
       explicateEffect(expr, continuation, basicBlocks)
