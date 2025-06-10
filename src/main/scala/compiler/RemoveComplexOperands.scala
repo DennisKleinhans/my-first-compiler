@@ -120,14 +120,17 @@ def simplifyExpr(
     val (thenAssignments, simpleThenExpr) = simplifyExpr(thn, gen)
     val (elseAssignments, simpleElseExpr) = simplifyExpr(els, gen)
 
-    val thenBegin = LMonIf.Begin(thenAssignments, simpleThenExpr)
-    val elseBegin = LMonIf.Begin(elseAssignments, simpleElseExpr)
-    val finalIfExpr = LMonIf.IfExpr(
-      simpleCondExpr,
-      thenBegin,
-      elseBegin
+    val tmpIdentifier = gen.freshName()
+    val newAssignment: LMonIf.AssignStmt = LMonIf.AssignStmt(
+      tmpIdentifier,
+      LMonIf.IfExpr(
+        simpleCondExpr,
+        LMonIf.Begin(thenAssignments, simpleThenExpr),
+        LMonIf.Begin(elseAssignments, simpleElseExpr)
+      )
     )
-    (condAssignments, finalIfExpr)
+
+    (condAssignments :+ newAssignment, AtomExpr(Atom.Variable(tmpIdentifier)))
 
   case LIf.ReadIntCall =>
     val tmpIdentifier = gen.freshName()
@@ -140,8 +143,8 @@ def simplifyExpr(
       AtomExpr(Atom.Variable(tmpIdentifier))
     )
 
-  case LIf.BinaryLogicOp(_, _, _) =>
-    sys error "rached BinaryLogicOp, but this should not happen, because this would be removed in the shrink pass"
+  case e @ LIf.BinaryLogicOp(_, _, _) =>
+    sys error s"rached BinaryLogicOp ($e), but this should not happen, because this would be removed in the shrink pass"
 
   /** Simplifies all expressions within a statement by extracting complex
     * subexpressions.
