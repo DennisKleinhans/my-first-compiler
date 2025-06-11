@@ -95,21 +95,13 @@ def simplifyExpr(
   case LWhile.Compare(cmp, e1, e2) =>
     val (assignmentsE1, atomExprE1) = simplifyExpr(e1, gen)
     val (assignmentsE2, atomExprE2) = simplifyExpr(e2, gen)
-    val tmpIdentifier = gen.freshName()
-    val newAssignment: LMonWhile.AssignStmt = LMonWhile.AssignStmt(
-      tmpIdentifier,
-      LMonWhile.Compare(
-        cmp,
-        extractAtom(atomExprE1),
-        extractAtom(atomExprE2)
-      )
+    val simpleCompare = LMonWhile.Compare(
+      cmp,
+      extractAtom(atomExprE1),
+      extractAtom(atomExprE2)
     )
-    val extendedAssignments =
-      assignmentsE1 ++ assignmentsE2 :+ newAssignment
-    (
-      extendedAssignments,
-      AtomExpr(Atom.Variable(tmpIdentifier))
-    )
+
+    (assignmentsE1 ++ assignmentsE2, simpleCompare)
 
   case LWhile.UnaryLogicOp(op, e) =>
     val (assignments, simplifiedExpr) = simplifyExpr(e, gen)
@@ -120,17 +112,14 @@ def simplifyExpr(
     val (thenAssignments, simpleThenExpr) = simplifyExpr(thn, gen)
     val (elseAssignments, simpleElseExpr) = simplifyExpr(els, gen)
 
-    val tmpIdentifier = gen.freshName()
-    val newAssignment: LMonWhile.AssignStmt = LMonWhile.AssignStmt(
-      tmpIdentifier,
+    val simpleIfExpr =
       LMonWhile.IfExpr(
         simpleCondExpr,
         LMonWhile.Begin(thenAssignments, simpleThenExpr),
         LMonWhile.Begin(elseAssignments, simpleElseExpr)
       )
-    )
 
-    (condAssignments :+ newAssignment, AtomExpr(Atom.Variable(tmpIdentifier)))
+    (condAssignments, simpleIfExpr)
 
   case LWhile.ReadIntCall =>
     val tmpIdentifier = gen.freshName()
@@ -170,8 +159,16 @@ def simplifyStmt(
       assignments :+ LMonWhile.ExprStmt(expr)
 
     case LWhile.PrintStmt(e) =>
-      val (assignments, atomExpr) = simplifyExpr(e, gen)
-      assignments :+ LMonWhile.PrintStmt(extractAtom(atomExpr))
+      val (assignments, expr) = simplifyExpr(e, gen)
+      expr match
+        case AtomExpr(a) =>
+          assignments :+ LMonWhile.PrintStmt(a)
+        case other =>
+          val tmpIdentifier = gen.freshName()
+          assignments ++ List(
+            LMonWhile.AssignStmt(tmpIdentifier, other),
+            LMonWhile.PrintStmt(Atom.Variable(tmpIdentifier))
+          )
 
     case LWhile.AssignStmt(Identifier(name), e) =>
       val (assignments, expr) = simplifyExpr(e, gen)
@@ -186,6 +183,21 @@ def simplifyStmt(
         simpleCondExpr,
         simplifiedThenStmts,
         simplifiedElseStmts
+      )
+
+    case LWhile.WhileStmt(test, body) =>
+      // 1) Test vereinfachen, aber Zuweisungen *nicht* vorziehen
+      val (_, simpleCondExpr) = simplifyExpr(test, gen)
+
+      // 2) Körper wie gehabt rekursiv simplifizieren
+      val simplifiedBodyStmts = body.flatMap(simplifyStmt(_, gen))
+
+      // 3) Nur noch eine WhileStmt zurückgeben – ohne condAssignments
+      List(
+        LMonWhile.WhileStmt(
+          simpleCondExpr,
+          simplifiedBodyStmts
+        )
       )
 
     /** Simplifies all statements in a module by flattening expressions

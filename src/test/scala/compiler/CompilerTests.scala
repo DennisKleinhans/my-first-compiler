@@ -51,10 +51,10 @@ val sexpInputIntCall = Node(
 )
 
 val onePlusOneAst =
-  LIf.BinaryNumericOp(
+  LWhile.BinaryNumericOp(
     BinaryNumericOperator.Add,
-    LIf.Constant(1),
-    LIf.Constant(1)
+    LWhile.Constant(1),
+    LWhile.Constant(1)
   )
 
 class ParserTests extends FunSuite {
@@ -72,7 +72,7 @@ class ParserTests extends FunSuite {
   def testReadExpression(
       name: String,
       input: SExp,
-      expected: LIf.Expr
+      expected: LWhile.Expr
   ): Unit = {
     test(s"fromSExpToExpr - $name") {
       assertEquals(LIfReader.fromSExpToExpr(input), expected)
@@ -83,21 +83,21 @@ class ParserTests extends FunSuite {
   testReadExpression(
     "binary: 4 - 2",
     sexpFourMinusTwo,
-    LIf.BinaryNumericOp(
+    LWhile.BinaryNumericOp(
       BinaryNumericOperator.Sub,
-      LIf.Constant(4),
-      LIf.Constant(2)
+      LWhile.Constant(4),
+      LWhile.Constant(2)
     )
   )
   testReadExpression(
     "unary: -8",
     sexpMinusEight,
-    LIf.UnaryNumericOp(UnaryNumericOperator.USub, LIf.Constant(8))
+    LWhile.UnaryNumericOp(UnaryNumericOperator.USub, LWhile.Constant(8))
   )
   testReadExpression(
     "call: read_int",
     sexpInputIntCall,
-    LIf.ReadIntCall
+    LWhile.ReadIntCall
   )
 
   // ───────────────────────────────────────────────────────────────
@@ -113,7 +113,7 @@ class ParserTests extends FunSuite {
     )
     assertEquals(
       LIfReader.fromSExpToStmt(sexp),
-      LIf.ExprStmt(onePlusOneAst)
+      LWhile.ExprStmt(onePlusOneAst)
     )
   }
 
@@ -127,7 +127,7 @@ class ParserTests extends FunSuite {
     )
     assertEquals(
       LIfReader.fromSExpToStmt(sexp),
-      LIf.AssignStmt(Identifier("x"), LIf.Constant(5))
+      LWhile.AssignStmt(Identifier("x"), LWhile.Constant(5))
     )
   }
 
@@ -157,11 +157,11 @@ class ParserTests extends FunSuite {
     )
     assertEquals(
       LIfReader.fromSExpToStmt(sexp),
-      LIf.PrintStmt(
-        LIf.BinaryNumericOp(
+      LWhile.PrintStmt(
+        LWhile.BinaryNumericOp(
           BinaryNumericOperator.Add,
-          LIf.Variable(Identifier("x")),
-          LIf.Constant(2)
+          LWhile.Variable(Identifier("x")),
+          LWhile.Constant(2)
         )
       )
     )
@@ -210,58 +210,58 @@ class LIntInterpreterTests extends FunSuite {
 
   test("LIntInterpreter.partialEvalExpr - constant folding") {
     val input =
-      LIf.BinaryNumericOp(
+      LWhile.BinaryNumericOp(
         BinaryNumericOperator.Add,
-        LIf.Constant(1),
-        LIf.Constant(2)
+        LWhile.Constant(1),
+        LWhile.Constant(2)
       )
-    val expected = LIf.Constant(3)
+    val expected = LWhile.Constant(3)
     assertEquals(LIntInterpreter.partialEvalExpr(input), expected)
   }
 
   test("LIntInterpreter.partialEvalExpr - nested folding") {
-    val input = LIf.BinaryNumericOp(
+    val input = LWhile.BinaryNumericOp(
       BinaryNumericOperator.Sub,
-      LIf.BinaryNumericOp(
+      LWhile.BinaryNumericOp(
         BinaryNumericOperator.Add,
-        LIf.Constant(2),
-        LIf.Constant(3)
+        LWhile.Constant(2),
+        LWhile.Constant(3)
       ),
-      LIf.Constant(1)
+      LWhile.Constant(1)
     )
-    val expected = LIf.Constant(4)
+    val expected = LWhile.Constant(4)
     assertEquals(LIntInterpreter.partialEvalExpr(input), expected)
   }
 
   test("LIntInterpreter.partialEvalExpr - symbolic parts remain") {
-    val input = LIf.BinaryNumericOp(
+    val input = LWhile.BinaryNumericOp(
       BinaryNumericOperator.Add,
-      LIf.BinaryNumericOp(
+      LWhile.BinaryNumericOp(
         BinaryNumericOperator.Add,
-        LIf.Constant(1),
-        LIf.Constant(2)
+        LWhile.Constant(1),
+        LWhile.Constant(2)
       ),
-      LIf.ReadIntCall
+      LWhile.ReadIntCall
     )
     val expected =
-      LIf.BinaryNumericOp(
+      LWhile.BinaryNumericOp(
         BinaryNumericOperator.Add,
-        LIf.Constant(3),
-        LIf.ReadIntCall
+        LWhile.Constant(3),
+        LWhile.ReadIntCall
       )
     assertEquals(LIntInterpreter.partialEvalExpr(input), expected)
   }
 
   test("LIntInterpreter.partialEvalStatement - partially simplified print") {
     val input =
-      LIf.PrintStmt(
-        LIf.BinaryNumericOp(
+      LWhile.PrintStmt(
+        LWhile.BinaryNumericOp(
           BinaryNumericOperator.Sub,
-          LIf.Constant(5),
-          LIf.Constant(3)
+          LWhile.Constant(5),
+          LWhile.Constant(3)
         )
       )
-    val expected = LIf.PrintStmt(LIf.Constant(2))
+    val expected = LWhile.PrintStmt(LWhile.Constant(2))
     assertEquals(LIntInterpreter.partialEvalStatement(input), expected)
   }
 }
@@ -277,34 +277,34 @@ class RemoveComplexOperandsTests extends FunSuite {
       LIfReader.fromSExpToModule(parse(program))
     )
 
-    val expected = LMonIf.Module(
+    val expected = LMonWhile.Module(
       List(
-        LMonIf.AssignStmt(
+        LMonWhile.AssignStmt(
           Identifier("$tmp$_1"),
-          LMonIf.BinaryNumericOp(
+          LMonWhile.BinaryNumericOp(
             BinaryNumericOperator.Add,
             Atom.Constant(2),
             Atom.Constant(2)
           )
         ),
-        LMonIf.AssignStmt(
+        LMonWhile.AssignStmt(
           Identifier("$tmp$_2"),
-          LMonIf.BinaryNumericOp(
+          LMonWhile.BinaryNumericOp(
             BinaryNumericOperator.Add,
             Atom.Constant(1),
             Atom.Variable(Identifier("$tmp$_1"))
           )
         ),
-        LMonIf.AssignStmt(
+        LMonWhile.AssignStmt(
           Identifier("$tmp$_3"),
-          LMonIf.BinaryNumericOp(
+          LMonWhile.BinaryNumericOp(
             BinaryNumericOperator.Sub,
             Atom.Variable(Identifier("$tmp$_2")),
             Atom.Constant(8)
           )
         ),
-        LMonIf.ExprStmt(
-          LMonIf.AtomExpr(
+        LMonWhile.ExprStmt(
+          LMonWhile.AtomExpr(
             Atom.Variable(Identifier("$tmp$_3"))
           )
         )
@@ -320,45 +320,31 @@ class RemoveComplexOperandsTests extends FunSuite {
       LIfReader.fromSExpToModule(parse(input))
     )
 
-    val expected = LMonIf.Module(
+    val expected = LMonWhile.Module(
       List(
-        LMonIf.AssignStmt(
-          Identifier("$tmp$_1"),
-          LMonIf.Compare(CompareOperator.Eq, Constant(1), Constant(1))
-        ),
-        LMonIf.AssignStmt(
-          Identifier("$tmp$_4"),
-          LMonIf.IfExpr(
-            LMonIf.AtomExpr(Variable(Identifier("$tmp$_1"))),
-            LMonIf.Begin(
+        LMonWhile.ExprStmt(
+          LMonWhile.IfExpr(
+            LMonWhile.Compare(CompareOperator.Eq, Constant(1), Constant(1)),
+            LMonWhile.Begin(
               List(
-                LMonIf.AssignStmt(
-                  Identifier("$tmp$_2"),
-                  LMonIf.BinaryNumericOp(
-                    BinaryNumericOperator.Add,
-                    Constant(1),
-                    Constant(1)
-                  )
+                LMonWhile.AssignStmt(
+                  Identifier("$tmp$_1"),
+                  LMonWhile.BinaryNumericOp(BinaryNumericOperator.Add, Constant(1), Constant(1))
                 )
               ),
-              LMonIf.AtomExpr(Variable(Identifier("$tmp$_2")))
+              LMonWhile.AtomExpr(Variable(Identifier("$tmp$_1")))
             ),
-            LMonIf.Begin(
+            LMonWhile.Begin(
               List(
-                LMonIf.AssignStmt(
-                  Identifier("$tmp$_3"),
-                  LMonIf.BinaryNumericOp(
-                    BinaryNumericOperator.Add,
-                    Constant(2),
-                    Constant(2)
-                  )
+                LMonWhile.AssignStmt(
+                  Identifier("$tmp$_2"),
+                  LMonWhile.BinaryNumericOp(BinaryNumericOperator.Add, Constant(2), Constant(2))
                 )
               ),
-              LMonIf.AtomExpr(Variable(Identifier("$tmp$_3")))
+              LMonWhile.AtomExpr(Variable(Identifier("$tmp$_2")))
             )
           )
-        ),
-        LMonIf.ExprStmt(LMonIf.AtomExpr(Variable(Identifier("$tmp$_4"))))
+        )
       )
     )
 
@@ -367,36 +353,36 @@ class RemoveComplexOperandsTests extends FunSuite {
 
   test("simplify Module - IfStmt") {
 
-    val expected = LMonIf.Module(
+    val expected = LMonWhile.Module(
       List(
-        LMonIf.AssignStmt(
+        LMonWhile.AssignStmt(
           Identifier("$tmp$_1"),
-          LMonIf
+          LMonWhile
             .Compare(CompareOperator.Eq, Atom.Constant(1), Atom.Constant(1))
         ),
-        LMonIf.IfStmt(
-          LMonIf.AtomExpr(Atom.Variable(Identifier("$tmp$_1"))),
+        LMonWhile.IfStmt(
+          LMonWhile.AtomExpr(Atom.Variable(Identifier("$tmp$_1"))),
           List(
-            LMonIf.AssignStmt(
+            LMonWhile.AssignStmt(
               Identifier("$tmp$_2"),
-              LMonIf.BinaryNumericOp(
+              LMonWhile.BinaryNumericOp(
                 BinaryNumericOperator.Add,
                 Atom.Constant(1),
                 Atom.Constant(1)
               )
             ),
-            LMonIf.PrintStmt(Atom.Variable(Identifier("$tmp$_2")))
+            LMonWhile.PrintStmt(Atom.Variable(Identifier("$tmp$_2")))
           ),
           List(
-            LMonIf.AssignStmt(
+            LMonWhile.AssignStmt(
               Identifier("$tmp$_3"),
-              LMonIf.BinaryNumericOp(
+              LMonWhile.BinaryNumericOp(
                 BinaryNumericOperator.Add,
                 Atom.Constant(2),
                 Atom.Constant(2)
               )
             ),
-            LMonIf.PrintStmt(Atom.Variable(Identifier("$tmp$_3")))
+            LMonWhile.PrintStmt(Atom.Variable(Identifier("$tmp$_3")))
           )
         )
       )
@@ -516,67 +502,95 @@ class selectInstructionsTests extends FunSuite {
 }
 
 class ShrinkTests extends FunSuite {
-  val andExpr = LIf.BinaryLogicOp(
+  val andExpr = LWhile.BinaryLogicOp(
     BinaryLogicOperator.And,
-    LIf.Constant(1),
-    LIf.Constant(2)
+    LWhile.Constant(1),
+    LWhile.Constant(2)
   )
 
-  val orExpr = LIf.BinaryLogicOp(
+  val orExpr = LWhile.BinaryLogicOp(
     BinaryLogicOperator.Or,
-    LIf.Constant(1),
-    LIf.Constant(2)
+    LWhile.Constant(1),
+    LWhile.Constant(2)
   )
 
-  val nestedAndInPrint = LIf.PrintStmt(andExpr)
-  val nestedAndInAssign = LIf.AssignStmt(Identifier("x"), andExpr)
+  val nestedAndInPrint = LWhile.PrintStmt(andExpr)
+  val nestedAndInAssign = LWhile.AssignStmt(Identifier("x"), andExpr)
 
   test("shrinkExpr - and") {
     val expected =
-      LIf.IfExpr(LIf.Constant(1), LIf.Constant(2), LIf.ConstantBool(false))
+      LWhile.IfExpr(
+        LWhile.Constant(1),
+        LWhile.Constant(2),
+        LWhile.ConstantBool(false)
+      )
     assertEquals(shrinkExpr(andExpr), expected)
   }
 
   test("shrinkExpr - or") {
     val expected =
-      LIf.IfExpr(LIf.Constant(1), LIf.ConstantBool(true), LIf.Constant(2))
+      LWhile.IfExpr(
+        LWhile.Constant(1),
+        LWhile.ConstantBool(true),
+        LWhile.Constant(2)
+      )
     assertEquals(shrinkExpr(orExpr), expected)
   }
 
   test("shrinkExpr - nested expression") {
     val input =
-      LIf.BinaryLogicOp(BinaryLogicOperator.And, LIf.Constant(3), orExpr)
-    val expected = LIf.IfExpr(
-      LIf.Constant(3),
-      LIf.IfExpr(LIf.Constant(1), LIf.ConstantBool(true), LIf.Constant(2)),
-      LIf.ConstantBool(false)
+      LWhile.BinaryLogicOp(BinaryLogicOperator.And, LWhile.Constant(3), orExpr)
+    val expected = LWhile.IfExpr(
+      LWhile.Constant(3),
+      LWhile.IfExpr(
+        LWhile.Constant(1),
+        LWhile.ConstantBool(true),
+        LWhile.Constant(2)
+      ),
+      LWhile.ConstantBool(false)
     )
     assertEquals(shrinkExpr(input), expected)
   }
 
   test("shrinkStmt - print") {
-    val expected = LIf.PrintStmt(
-      LIf.IfExpr(LIf.Constant(1), LIf.Constant(2), LIf.ConstantBool(false))
+    val expected = LWhile.PrintStmt(
+      LWhile.IfExpr(
+        LWhile.Constant(1),
+        LWhile.Constant(2),
+        LWhile.ConstantBool(false)
+      )
     )
     assertEquals(shrinkStmt(nestedAndInPrint), expected)
   }
 
   test("shrinkStmt - assign") {
-    val expected = LIf.AssignStmt(
+    val expected = LWhile.AssignStmt(
       Identifier("x"),
-      LIf.IfExpr(LIf.Constant(1), LIf.Constant(2), LIf.ConstantBool(false))
+      LWhile.IfExpr(
+        LWhile.Constant(1),
+        LWhile.Constant(2),
+        LWhile.ConstantBool(false)
+      )
     )
     assertEquals(shrinkStmt(nestedAndInAssign), expected)
   }
 
   test("shrinkModule - assing and print") {
-    val input = LIf.Module(nestedAndInAssign :: nestedAndInPrint :: Nil)
-    val expected = LIf.Module(
-      (LIf.AssignStmt(
+    val input = LWhile.Module(nestedAndInAssign :: nestedAndInPrint :: Nil)
+    val expected = LWhile.Module(
+      (LWhile.AssignStmt(
         Identifier("x"),
-        LIf.IfExpr(LIf.Constant(1), LIf.Constant(2), LIf.ConstantBool(false))
-      )) :: LIf.PrintStmt(
-        LIf.IfExpr(LIf.Constant(1), LIf.Constant(2), LIf.ConstantBool(false))
+        LWhile.IfExpr(
+          LWhile.Constant(1),
+          LWhile.Constant(2),
+          LWhile.ConstantBool(false)
+        )
+      )) :: LWhile.PrintStmt(
+        LWhile.IfExpr(
+          LWhile.Constant(1),
+          LWhile.Constant(2),
+          LWhile.ConstantBool(false)
+        )
       ) :: Nil
     )
     assertEquals(shrinkModule(input), expected)
@@ -587,12 +601,12 @@ class EndToEndTests extends FunSuite {
   test("End-to-End: object language -> AST - print(1 + 1)") {
     val printCall = "print(1+1)"
 
-    val expected = LIf.Module(
-      LIf.PrintStmt(
-        LIf.BinaryNumericOp(
+    val expected = LWhile.Module(
+      LWhile.PrintStmt(
+        LWhile.BinaryNumericOp(
           BinaryNumericOperator.Add,
-          LIf.Constant(1),
-          LIf.Constant(1)
+          LWhile.Constant(1),
+          LWhile.Constant(1)
         )
       ) :: Nil
     )
@@ -601,12 +615,16 @@ class EndToEndTests extends FunSuite {
 
   test("End-to-End: object language -> AST - IfExpr") {
     val input = "if 1 < 2 then true else false"
-    val expected = LIf.Module(
-      LIf.ExprStmt(
-        LIf.IfExpr(
-          LIf.Compare(CompareOperator.Lt, LIf.Constant(1), LIf.Constant(2)),
-          LIf.ConstantBool(true),
-          LIf.ConstantBool(false)
+    val expected = LWhile.Module(
+      LWhile.ExprStmt(
+        LWhile.IfExpr(
+          LWhile.Compare(
+            CompareOperator.Lt,
+            LWhile.Constant(1),
+            LWhile.Constant(2)
+          ),
+          LWhile.ConstantBool(true),
+          LWhile.ConstantBool(false)
         )
       ) :: Nil
     )
@@ -615,11 +633,12 @@ class EndToEndTests extends FunSuite {
   }
   test("End-to-End: object language -> AST - IfStmt") {
     val input = "if (1 < 2) {true} else {false}"
-    val expected = LIf.Module(
-      LIf.IfStmt(
-        LIf.Compare(CompareOperator.Lt, LIf.Constant(1), LIf.Constant(2)),
-        LIf.ExprStmt(LIf.ConstantBool(true)) :: Nil,
-        LIf.ExprStmt(LIf.ConstantBool(false)) :: Nil
+    val expected = LWhile.Module(
+      LWhile.IfStmt(
+        LWhile
+          .Compare(CompareOperator.Lt, LWhile.Constant(1), LWhile.Constant(2)),
+        LWhile.ExprStmt(LWhile.ConstantBool(true)) :: Nil,
+        LWhile.ExprStmt(LWhile.ConstantBool(false)) :: Nil
       ) :: Nil
     )
 
@@ -627,12 +646,12 @@ class EndToEndTests extends FunSuite {
   }
   test("End-to-End: object language -> AST - BinaryLogicOp") {
     val input = "true && false"
-    val expected = LIf.Module(
-      LIf.ExprStmt(
-        LIf.BinaryLogicOp(
+    val expected = LWhile.Module(
+      LWhile.ExprStmt(
+        LWhile.BinaryLogicOp(
           BinaryLogicOperator.And,
-          LIf.ConstantBool(true),
-          LIf.ConstantBool(false)
+          LWhile.ConstantBool(true),
+          LWhile.ConstantBool(false)
         )
       ) :: Nil
     )
@@ -641,11 +660,15 @@ class EndToEndTests extends FunSuite {
   }
   test("End-to-End: object language -> AST - UnaryLogicOp") {
     val input = "!(1 < 2)"
-    val expected = LIf.Module(
-      LIf.ExprStmt(
-        LIf.UnaryLogicOp(
+    val expected = LWhile.Module(
+      LWhile.ExprStmt(
+        LWhile.UnaryLogicOp(
           UnaryLogicOperator.Not,
-          LIf.Compare(CompareOperator.Lt, LIf.Constant(1), LIf.Constant(2))
+          LWhile.Compare(
+            CompareOperator.Lt,
+            LWhile.Constant(1),
+            LWhile.Constant(2)
+          )
         )
       ) :: Nil
     )

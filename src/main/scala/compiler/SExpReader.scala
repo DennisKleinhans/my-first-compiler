@@ -151,6 +151,9 @@ object LIfReader {
         case other =>
           LWhile.ExprStmt(other)
 
+    case Node(Symbol("While") :: test :: Node(body) :: Nil) =>
+      LWhile.WhileStmt(fromSExpToExpr(test), body.map(fromSExpToStmt))
+
     case other =>
       sys.error(s"invalid statement: $other")
 

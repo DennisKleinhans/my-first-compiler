@@ -13,7 +13,10 @@ import CommonNodes.Atom.*
   *   distinct across the entire translation.
   */
 object LabelGenerator {
-  private var counter = 0
+  private var blockCounter = 0
+  private var condCounter = 0
+  private var doneCounter = 0
+  private var bodyCounter = 0
 
   /** Produce a fresh, unique label string by appending a global counter to the
     * given base name.
@@ -24,9 +27,24 @@ object LabelGenerator {
     * @return
     *   A new label of the form `nameN` where `N` is the next unused integer.
     */
-  def freshLabel(name: String = "block"): CIf.Label =
-    counter += 1
-    name + counter
+  def freshBlockLabel(name: String = "block"): CIf.Label =
+    blockCounter += 1
+    name + blockCounter
+
+  def freshCondLable(name: String = "cond"): CIf.Label = {
+    condCounter += 1
+    name + condCounter
+  }
+
+  def freshDoneLabel(name: String = "done"): CIf.Label = {
+    doneCounter += 1
+    name + doneCounter
+  }
+
+  def freshBodyLabel(name: String = "body"): CIf.Label = {
+    bodyCounter += 1
+    name + bodyCounter
+  }
 }
 
 /** Translate a LMonIf expression into one or more CIf BasicBlocks that assign
@@ -83,7 +101,7 @@ def explicateAssign(
   expr match {
     case LMonWhile.IfExpr(cond, thn, els) =>
       // 1. Create a new label for the continuation block and insert it into basicBlocks
-      val contLabel = LabelGenerator.freshLabel()
+      val contLabel = LabelGenerator.freshBlockLabel()
       basicBlocks(contLabel) = continuation
 
       // 2. Translate the “then” branch so that it computes into `id` and then jumps to contLabel
@@ -180,12 +198,24 @@ def explicatePred(
 ): CIf.BasicBlock = {
   condition match {
     case LMonWhile.Compare(cmp, e1, e2) =>
-      // Generate fresh labels for the “then” and “else” targets, insert them in the map
-      val thenLable = LabelGenerator.freshLabel()
-      val elseLable = LabelGenerator.freshLabel()
 
-      basicBlocks(thenLable) = thn
-      basicBlocks(elseLable) = els
+    def pickLabel(block: CIf.BasicBlock): String = block match {
+      case CIf.BasicBlock(Nil, CIf.Goto(lbl)) =>
+        // schon ein reiner Goto-Block ⇒ wir können direkt dieses Label verwenden
+        lbl
+      case _ =>
+        // komplexerer Block ⇒ wir brauchen einen echten Label-Eintrag
+        val fresh = LabelGenerator.freshBlockLabel()
+        basicBlocks(fresh) = block
+        fresh
+  }
+
+      // Generate fresh labels for the “then” and “else” targets, insert them in the map
+      val thenLable = pickLabel(thn)
+      val elseLable = pickLabel(els)
+
+      // basicBlocks(thenLable) = thn
+      // basicBlocks(elseLable) = els
 
       // Build an If‐tail: If(e1 cmp e2) goto thenLabel else goto elseLabel
       val compareExpr: CIf.Compare = CIf.Compare(cmp, e1, e2)
@@ -341,7 +371,7 @@ def explicateStmt(
 
     case LMonWhile.IfStmt(cond, thenBranch, elseBranch) =>
       // 1. Create a new label for the join‐continuation and store `continuation` under it.
-      val contLabel = LabelGenerator.freshLabel()
+      val contLabel = LabelGenerator.freshBlockLabel()
       basicBlocks(contLabel) = continuation
 
       // 2. Build the “then” chain: each stmt in thenBranch, folded right, ending with Goto(contLabel)
@@ -360,6 +390,36 @@ def explicateStmt(
 
       // 4. Create a predicate‐block that tests `cond` and jumps to either thenBlock or elseBlock
       explicatePred(cond, thenBlock, elseBlock, basicBlocks)
+
+    case LMonWhile.WhileStmt(cond, body) =>
+      // 1. Labels erzeugen
+      val condLbl = LabelGenerator.freshCondLable()
+      val bodyLbl = LabelGenerator.freshBodyLabel()
+      val doneLbl = LabelGenerator.freshDoneLabel()
+
+      // 2. done-Block = continuation
+      basicBlocks(doneLbl) = continuation
+
+      // 3. body-Block: am Ende zurück zur Bedingung springen
+      val backToCond = CIf.BasicBlock(Nil, CIf.Goto(condLbl))
+      val bodyEntry = body.foldRight(backToCond) { (stmt, cont) =>
+        explicateStmt(stmt, cont, basicBlocks)
+      }
+      basicBlocks(bodyLbl) = bodyEntry
+
+      // 4. cond-Block: Test und Sprünge zu bodyLbl oder doneLbl
+      // Erzeuge zwei “Pseudo-Blöcke”, die nur den Sprung definieren:
+      val thnBlock = CIf.BasicBlock(Nil, CIf.Goto(bodyLbl))
+      val elsBlock = CIf.BasicBlock(Nil, CIf.Goto(doneLbl))
+
+      // Lass explicatePred nun die Compare-Logik aus dem LMon-AST direkt hier
+      val condBlock = explicatePred(cond, thnBlock, elsBlock, basicBlocks)
+
+      // Speichere den so erzeugten Block unter condLbl
+      basicBlocks(condLbl) = condBlock
+
+      // 5. Entry-Block: erster Sprung in cond-Block
+      CIf.BasicBlock(Nil, CIf.Goto(condLbl))
   }
 }
 

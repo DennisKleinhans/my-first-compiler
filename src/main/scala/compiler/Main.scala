@@ -15,10 +15,14 @@ def main(): Unit =
   // val path = "examples/print_42.lang"
   // compile(Paths.get(path))
   val parsed = parse(
-    "if (5 > 3) {  print(1)} else {  print(0)}"
+    """
+  if 1==1 then 1+1 else 2+2
+  """
   )
 
+  
 
+  println("after parse: " + parsed)
   val sexped = LIfReader.fromSExpToModule(parsed)
   println("after sexp: " + sexped)
   val shrinked = shrinkModule(sexped)

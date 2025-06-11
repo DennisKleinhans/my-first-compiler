@@ -27,6 +27,8 @@ def shrinkStmt(stmt: LWhile.Stmt): LWhile.Stmt = stmt match
       thenBranch.map(shrinkStmt),
       elseBranch.map(shrinkStmt)
     )
+  case LWhile.WhileStmt(cond, body) =>
+    LWhile.WhileStmt(shrinkExpr(cond), body.map(shrinkStmt))
 
 /** Shrinks an expression by simplifying its structure and removing unnecessary
   * complexity by replacing the `and` and `or` operators with if expressions.
