@@ -198,17 +198,17 @@ def explicatePred(
 ): CIf.BasicBlock = {
   condition match {
     case LMonWhile.Compare(cmp, e1, e2) =>
-
-    def pickLabel(block: CIf.BasicBlock): String = block match {
-      case CIf.BasicBlock(Nil, CIf.Goto(lbl)) =>
-        // schon ein reiner Goto-Block ⇒ wir können direkt dieses Label verwenden
-        lbl
-      case _ =>
-        // komplexerer Block ⇒ wir brauchen einen echten Label-Eintrag
-        val fresh = LabelGenerator.freshBlockLabel()
-        basicBlocks(fresh) = block
-        fresh
-  }
+      // Helper to pick a label for the BasicBlock, either by reusing an existing Goto or creating a new one
+      def pickLabel(block: CIf.BasicBlock): String = block match {
+        case CIf.BasicBlock(Nil, CIf.Goto(lbl)) =>
+          // schon ein reiner Goto-Block ⇒ wir können direkt dieses Label verwenden
+          lbl
+        case _ =>
+          // komplexerer Block ⇒ wir brauchen einen echten Label-Eintrag
+          val fresh = LabelGenerator.freshBlockLabel()
+          basicBlocks(fresh) = block
+          fresh
+      }
 
       // Generate fresh labels for the “then” and “else” targets, insert them in the map
       val thenLable = pickLabel(thn)
@@ -392,33 +392,29 @@ def explicateStmt(
       explicatePred(cond, thenBlock, elseBlock, basicBlocks)
 
     case LMonWhile.WhileStmt(cond, body) =>
-      // 1. Labels erzeugen
+      // 1. Create fresh labels for the condition, body, and done blocks
       val condLbl = LabelGenerator.freshCondLable()
       val bodyLbl = LabelGenerator.freshBodyLabel()
       val doneLbl = LabelGenerator.freshDoneLabel()
 
-      // 2. done-Block = continuation
+      // 2. Store the continuation under doneLbl
       basicBlocks(doneLbl) = continuation
 
-      // 3. body-Block: am Ende zurück zur Bedingung springen
+      // 3. bodyLbl: Translate the body statements, ending with a jump back to condLbl
       val backToCond = CIf.BasicBlock(Nil, CIf.Goto(condLbl))
       val bodyEntry = body.foldRight(backToCond) { (stmt, cont) =>
         explicateStmt(stmt, cont, basicBlocks)
       }
       basicBlocks(bodyLbl) = bodyEntry
 
-      // 4. cond-Block: Test und Sprünge zu bodyLbl oder doneLbl
-      // Erzeuge zwei “Pseudo-Blöcke”, die nur den Sprung definieren:
+      // 4. condLbl: Create a new BasicBlock that tests the condition and jumps to either bodyLbl or doneLbl
       val thnBlock = CIf.BasicBlock(Nil, CIf.Goto(bodyLbl))
       val elsBlock = CIf.BasicBlock(Nil, CIf.Goto(doneLbl))
 
-      // Lass explicatePred nun die Compare-Logik aus dem LMon-AST direkt hier
       val condBlock = explicatePred(cond, thnBlock, elsBlock, basicBlocks)
 
-      // Speichere den so erzeugten Block unter condLbl
       basicBlocks(condLbl) = condBlock
 
-      // 5. Entry-Block: erster Sprung in cond-Block
       CIf.BasicBlock(Nil, CIf.Goto(condLbl))
   }
 }
