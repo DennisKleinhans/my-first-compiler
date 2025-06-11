@@ -7,6 +7,15 @@ import x86.ByteReg
 
 def isTooBig(imm: Long): Boolean = imm > Int.MaxValue || imm < Int.MinValue
 
+/** Patches a x86 program to avoid illegal memory-to-memory operations and
+  * immediates >32-bit by introducing the RAX register as an intermediate.
+  *
+  * @param program
+  *   The x86 program to patch.
+  * @return
+  *   A patched x86 program with memory-to-memory moves replaced by two-step
+  *   moves through RAX.
+  */
 def patchInstructions(program: x86.Program): x86.Program = {
 
   val patchedBlocks = program.blocks.map { (label, instrs) =>
