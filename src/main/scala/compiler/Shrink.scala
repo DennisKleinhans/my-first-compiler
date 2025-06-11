@@ -1,37 +1,34 @@
 package compiler
 
-import compiler.LIf.Expr
+import compiler.LWhile.Expr
 import CommonNodes.*
-import compiler.LIf.Stmt
+import compiler.LWhile.Stmt
 
-/**
-  * Shrinks the LIf module by simplifying its statements and expressions.
+/** Shrinks the LIf module by simplifying its statements and expressions.
   *
   * @param module
   * @return
   */
-def shrinkModule(module: LIf.Module): LIf.Module =
-  LIf.Module(module.stmts.map(shrinkStmt))
+def shrinkModule(module: LWhile.Module): LWhile.Module =
+  LWhile.Module(module.stmts.map(shrinkStmt))
 
-/**
-  * Shrinks a single statement by simplifying its expressions.
+/** Shrinks a single statement by simplifying its expressions.
   *
   * @param stmt
   * @return
   */
-def shrinkStmt(stmt: LIf.Stmt): LIf.Stmt = stmt match
-  case LIf.ExprStmt(e)       => LIf.ExprStmt(shrinkExpr(e))
-  case LIf.PrintStmt(e)      => LIf.PrintStmt(shrinkExpr(e))
-  case LIf.AssignStmt(id, e) => LIf.AssignStmt(id, shrinkExpr(e))
-  case LIf.IfStmt(cond, thenBranch, elseBranch) =>
-    LIf.IfStmt(
+def shrinkStmt(stmt: LWhile.Stmt): LWhile.Stmt = stmt match
+  case LWhile.ExprStmt(e)       => LWhile.ExprStmt(shrinkExpr(e))
+  case LWhile.PrintStmt(e)      => LWhile.PrintStmt(shrinkExpr(e))
+  case LWhile.AssignStmt(id, e) => LWhile.AssignStmt(id, shrinkExpr(e))
+  case LWhile.IfStmt(cond, thenBranch, elseBranch) =>
+    LWhile.IfStmt(
       shrinkExpr(cond),
       thenBranch.map(shrinkStmt),
       elseBranch.map(shrinkStmt)
     )
 
-/**
-  * Shrinks an expression by simplifying its structure and removing unnecessary
+/** Shrinks an expression by simplifying its structure and removing unnecessary
   * complexity by replacing the `and` and `or` operators with if expressions.
   *
   * @param e
@@ -39,17 +36,21 @@ def shrinkStmt(stmt: LIf.Stmt): LIf.Stmt = stmt match
   * @return
   *   a simplified version of the expression
   */
-def shrinkExpr(e: LIf.Expr): LIf.Expr = e match
-  case LIf.UnaryNumericOp(op, e) => LIf.UnaryNumericOp(op, shrinkExpr(e))
-  case LIf.UnaryLogicOp(op, e)   => LIf.UnaryLogicOp(op, shrinkExpr(e))
-  case LIf.BinaryNumericOp(op, lhs, rhs) =>
-    LIf.BinaryNumericOp(op, shrinkExpr(lhs), shrinkExpr(rhs))
-  case LIf.BinaryLogicOp(BinaryLogicOperator.And, e1, e2) =>
-    LIf.IfExpr(shrinkExpr(e1), shrinkExpr(e2), LIf.ConstantBool(false))
-  case LIf.BinaryLogicOp(BinaryLogicOperator.Or, e1, e2) =>
-    LIf.IfExpr(shrinkExpr(e1), LIf.ConstantBool(true), shrinkExpr(e2))
+def shrinkExpr(e: LWhile.Expr): LWhile.Expr = e match
+  case LWhile.UnaryNumericOp(op, e) => LWhile.UnaryNumericOp(op, shrinkExpr(e))
+  case LWhile.UnaryLogicOp(op, e)   => LWhile.UnaryLogicOp(op, shrinkExpr(e))
+  case LWhile.BinaryNumericOp(op, lhs, rhs) =>
+    LWhile.BinaryNumericOp(op, shrinkExpr(lhs), shrinkExpr(rhs))
+  case LWhile.BinaryLogicOp(BinaryLogicOperator.And, e1, e2) =>
+    LWhile.IfExpr(shrinkExpr(e1), shrinkExpr(e2), LWhile.ConstantBool(false))
+  case LWhile.BinaryLogicOp(BinaryLogicOperator.Or, e1, e2) =>
+    LWhile.IfExpr(shrinkExpr(e1), LWhile.ConstantBool(true), shrinkExpr(e2))
   case Expr.Compare(cmp, lhs, rhs) =>
-    LIf.Compare(cmp, shrinkExpr(lhs), shrinkExpr(rhs))
+    LWhile.Compare(cmp, shrinkExpr(lhs), shrinkExpr(rhs))
   case Expr.IfExpr(condExpr, thenExpr, elseExpr) =>
-    LIf.IfExpr(shrinkExpr(condExpr), shrinkExpr(thenExpr), shrinkExpr(elseExpr))
+    LWhile.IfExpr(
+      shrinkExpr(condExpr),
+      shrinkExpr(thenExpr),
+      shrinkExpr(elseExpr)
+    )
   case _ => e

@@ -52,33 +52,34 @@ object CommonNodes {
   case class Identifier(name: String)
 }
 
-/** The abstract syntax tree (AST) for the LIf language.
+/** The abstract syntax tree (AST) for the LWhile language.
   *
-  * Represents the structure of LIf programs after parsing and before
+  * Represents the structure of LWhile programs after parsing and before
   * interpretation or compilation.
   */
-object LIf {
+object LWhile {
   import CommonNodes.*
   export Expr.*
   export Stmt.*
 
-  /** A module is the top-level program structure in LIf.
+  /** A module is the top-level program structure in LWhile.
     *
     * @param stmts
     *   the list of statements contained in the module
     */
   case class Module(stmts: List[Stmt])
 
-  /** A statement in LIf represents either a standalone expression, a print
-    * operation, an assign operation or a if Statement.
+  /** A statement in LWhile represents either a standalone expression, a print
+    * operation, an assign operation, a if Statement or a while statement.
     */
   enum Stmt:
     case ExprStmt(e: Expr)
     case PrintStmt(e: Expr)
     case AssignStmt(id: Identifier, e: Expr)
     case IfStmt(cond: Expr, thenBranch: List[Stmt], elseBranch: List[Stmt])
+    case WhileStmt(cond: Expr, body: List[Stmt])
 
-  /** An expression in LIf can be a constant value (Long or Boolean), a
+  /** An expression in LWhile can be a constant value (Long or Boolean), a
     * Variable, a unary operation, a binary operation a function call, a compare
     * operation or a if expression.
     */
@@ -95,34 +96,35 @@ object LIf {
     case IfExpr(condExpr: Expr, thenExpr: Expr, elseExpr: Expr)
 }
 
-/** The abstract syntax tree (AST) for the LMonIf language.
+/** The abstract syntax tree (AST) for the LMonWhile language.
   *
-  * Represents the structure of LMonIf programs after parsing and before
+  * Represents the structure of LMonWhile programs after parsing and before
   * interpretation or compilation.
   */
-object LMonIf {
+object LMonWhile {
   import CommonNodes.*
   import CommonNodes.Atom
   export Expr.*
   export Stmt.*
 
-  /** A module is the top-level program structure in LMonIf.
+  /** A module is the top-level program structure in LMonWhile.
     *
     * @param stmts
     *   the list of statements contained in the module
     */
   case class Module(stmts: List[Stmt])
 
-  /** A statement in LMonIf represents either a standalone expression, a print
-    * operation, an assign operation or a if statement.
+  /** A statement in LMonWhile represents either a standalone expression, a print
+    * operation, an assign operation, a if statement or a while statement.
     */
   enum Stmt:
     case AssignStmt(id: Identifier, rhs: Expr)
     case PrintStmt(a: Atom)
     case ExprStmt(e: Expr)
     case IfStmt(cond: Expr, thenBranch: List[Stmt], elseBranch: List[Stmt])
+    case WhileStmt(cond: Expr, body: List[Stmt])
 
-  /** An expression in LMonIf can be a constant value (Long or Boolean), a unary
+  /** An expression in LMonWhile can be a constant value (Long or Boolean), a unary
     * operation, a binary operation, a function call with the restriction to
     * only accept atoms or a if expression also with the restiction to only
     * accept atoms.
