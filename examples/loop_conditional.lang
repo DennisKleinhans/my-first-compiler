@@ -1,0 +1,9 @@
+x = 0
+while (x < 5) {
+  if (x < 2) {
+    print(1)
+  } else {
+    print(0)
+  }
+  x = x + 1
+}
