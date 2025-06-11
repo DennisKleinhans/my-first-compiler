@@ -7,6 +7,13 @@ import compiler.CIf.Tail
 import x86.Reg
 import compiler.x86VarIf.Immediate
 
+
+def reorderCmpArgs(a1: x86VarIf.Arg, a2: x86VarIf.Arg): (x86VarIf.Arg, x86VarIf.Arg) = 
+  (a1, a2) match
+    case (imm: x86VarIf.Immediate, _: x86VarIf.Variable) => (imm, a2)
+    case (_: x86VarIf.Variable, imm: x86VarIf.Immediate) => (imm, a1)
+    case _ => (a1, a2)
+
 /** Converts an atom to an x86Var argument.
   *
   * @param atom
@@ -46,7 +53,7 @@ def ccFromCompareOperator(op: CommonNodes.CompareOperator): x86.Cc = op match
   */
 def selectInstructions(program: CIf.CProgram): x86VarIf.Program =
   val selectedBlocks: Map[String, List[x86VarIf.Instr]] = program.blocks.map {
-    case (lable, basicBlock) =>
+    (lable, basicBlock) =>
       val stmtsInstrs = basicBlock.stmts.flatMap(lowerStmt)
       val tailInstrs = lowerTail(basicBlock.tail)
       lable -> (stmtsInstrs ++ tailInstrs)
@@ -90,8 +97,7 @@ def lowerStmt(stmt: CIf.Stmt): List[x86VarIf.Instr] = stmt match
       // If we could eliminate this case here, we could produce better code an discard unnecessary assignments to tmp variables
       case CIf.Compare(cmp, e1, e2) =>
         val cc = ccFromCompareOperator(cmp)
-        val arg1 = argFromAtom(e1)
-        val arg2 = argFromAtom(e2)
+        val (arg1, arg2) = reorderCmpArgs(argFromAtom(e2), argFromAtom(e1))
         List(
           x86VarIf.CmpQ(arg1, arg2),
           x86VarIf.Set(cc, ByteReg.Al),
@@ -152,8 +158,9 @@ def lowerTail(tail: CIf.Tail): List[x86VarIf.Instr] = tail match
 
   case CIf.If(cmp, thenGoto, elseGoto) =>
     val cc = ccFromCompareOperator(cmp.cmp)
+    val (arg1, arg2) = reorderCmpArgs(argFromAtom(cmp.rhs), argFromAtom(cmp.lhs))
     List(
-      x86VarIf.CmpQ(argFromAtom(cmp.lhs), argFromAtom(cmp.rhs)),
+      x86VarIf.CmpQ(arg1, arg2),
       x86VarIf.JmpIf(cc, thenGoto.lable),
       x86VarIf.Jmp(elseGoto.lable)
     )

@@ -20,10 +20,10 @@ def shrinkModule(module: LIf.Module): LIf.Module =
   * @return
   */
 def shrinkStmt(stmt: LIf.Stmt): LIf.Stmt = stmt match
-  case Stmt.ExprStmt(e)       => LIf.ExprStmt(shrinkExpr(e))
-  case Stmt.PrintStmt(e)      => LIf.PrintStmt(shrinkExpr(e))
-  case Stmt.AssignStmt(id, e) => LIf.AssignStmt(id, shrinkExpr(e))
-  case Stmt.IfStmt(cond, thenBranch, elseBranch) =>
+  case LIf.ExprStmt(e)       => LIf.ExprStmt(shrinkExpr(e))
+  case LIf.PrintStmt(e)      => LIf.PrintStmt(shrinkExpr(e))
+  case LIf.AssignStmt(id, e) => LIf.AssignStmt(id, shrinkExpr(e))
+  case LIf.IfStmt(cond, thenBranch, elseBranch) =>
     LIf.IfStmt(
       shrinkExpr(cond),
       thenBranch.map(shrinkStmt),
@@ -40,9 +40,9 @@ def shrinkStmt(stmt: LIf.Stmt): LIf.Stmt = stmt match
   *   a simplified version of the expression
   */
 def shrinkExpr(e: LIf.Expr): LIf.Expr = e match
-  case Expr.UnaryNumericOp(op, e) => LIf.UnaryNumericOp(op, shrinkExpr(e))
-  case Expr.UnaryLogicOp(op, e)   => LIf.UnaryLogicOp(op, shrinkExpr(e))
-  case Expr.BinaryNumericOp(op, lhs, rhs) =>
+  case LIf.UnaryNumericOp(op, e) => LIf.UnaryNumericOp(op, shrinkExpr(e))
+  case LIf.UnaryLogicOp(op, e)   => LIf.UnaryLogicOp(op, shrinkExpr(e))
+  case LIf.BinaryNumericOp(op, lhs, rhs) =>
     LIf.BinaryNumericOp(op, shrinkExpr(lhs), shrinkExpr(rhs))
   case LIf.BinaryLogicOp(BinaryLogicOperator.And, e1, e2) =>
     LIf.IfExpr(shrinkExpr(e1), shrinkExpr(e2), LIf.ConstantBool(false))

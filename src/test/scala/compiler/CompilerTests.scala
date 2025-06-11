@@ -324,24 +324,24 @@ class RemoveComplexOperandsTests extends FunSuite {
       List(
         LMonIf.AssignStmt(
           Identifier("$tmp$_1"),
-          LMonIf
-            .Compare(CompareOperator.Eq, Atom.Constant(1), Atom.Constant(1))
+          LMonIf.Compare(CompareOperator.Eq, Constant(1), Constant(1))
         ),
-        LMonIf.ExprStmt(
+        LMonIf.AssignStmt(
+          Identifier("$tmp$_4"),
           LMonIf.IfExpr(
-            LMonIf.AtomExpr(Atom.Variable(Identifier("$tmp$_1"))),
+            LMonIf.AtomExpr(Variable(Identifier("$tmp$_1"))),
             LMonIf.Begin(
               List(
                 LMonIf.AssignStmt(
                   Identifier("$tmp$_2"),
                   LMonIf.BinaryNumericOp(
                     BinaryNumericOperator.Add,
-                    Atom.Constant(1),
-                    Atom.Constant(1)
+                    Constant(1),
+                    Constant(1)
                   )
                 )
               ),
-              LMonIf.AtomExpr(Atom.Variable(Identifier("$tmp$_2")))
+              LMonIf.AtomExpr(Variable(Identifier("$tmp$_2")))
             ),
             LMonIf.Begin(
               List(
@@ -349,15 +349,16 @@ class RemoveComplexOperandsTests extends FunSuite {
                   Identifier("$tmp$_3"),
                   LMonIf.BinaryNumericOp(
                     BinaryNumericOperator.Add,
-                    Atom.Constant(2),
-                    Atom.Constant(2)
+                    Constant(2),
+                    Constant(2)
                   )
                 )
               ),
-              LMonIf.AtomExpr(Atom.Variable(Identifier("$tmp$_3")))
+              LMonIf.AtomExpr(Variable(Identifier("$tmp$_3")))
             )
           )
-        )
+        ),
+        LMonIf.ExprStmt(LMonIf.AtomExpr(Variable(Identifier("$tmp$_4"))))
       )
     )
 

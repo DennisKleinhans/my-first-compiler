@@ -15,7 +15,6 @@ def preludeAndConclusion(
   val mainBlock = List(PushQ(Reg.Rbp)) ++
     List(
       MovQ(Reg.Rsp, Reg.Rbp),
-      MovQ(Reg.Rsp, Reg.Rbp),
       SubQ(Immediate(alignedSpace), Reg.Rsp),
       Jmp("start")
     )
@@ -23,7 +22,6 @@ def preludeAndConclusion(
   val conclusionBlock = List(
     AddQ(Immediate(alignedSpace), Reg.Rsp),
     PopQ(Reg.Rbp),
-    MovQ(Immediate(0), Reg.Rax),
     RetQ
   )
 
