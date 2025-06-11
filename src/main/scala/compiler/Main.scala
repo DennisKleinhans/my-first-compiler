@@ -14,27 +14,46 @@ import scala.io.StdIn
 def main(): Unit =
   // val path = "examples/print_42.lang"
   // compile(Paths.get(path))
-  val prog = "x = 5 print(x + 2)"
-  val parsed = LVarReader.fromSExpToModule(parse(prog))
-  // println(parsed)
+  val parsed = parse(
+    "if (5 > 3) {  print(1)} else {  print(0)}"
+  )
+
+
+  val sexped = LIfReader.fromSExpToModule(parsed)
+  println("after sexp: " + sexped)
+  val shrinked = shrinkModule(sexped)
+  println("after shrink: " + shrinked)
+  val removedComplex = simplifyModule(shrinked)
+  println("after removedComplexOperands: " + removedComplex)
+  val controlled = explicateControl(removedComplex)
+  println("after explicateControll: " + controlled)
+  val selctedInstructions = selectInstructions(controlled)
+  println("after selectInstructions: " + selctedInstructions)
+  val (assignedHomes, stackSpace) = assignHomes(selctedInstructions)
+  println("after assignHomes: " + assignedHomes)
+  val patchedInstructions = patchInstructions(assignedHomes)
+  println("after patchInstructions: " + patchedInstructions)
+  val finalProg = preludeAndConclusion(patchedInstructions, stackSpace)
+  println("after preludeAndConclusion: " + finalProg)
 
 def compile(input: Path): Path = {
   val basename = input.getFileName.toString.replace(".lang", "")
   val source = readFile(input)
   val sexped = parse(source)
-  val target = replaceMeWithTheActualCompilation(sexped)
+  val target = transformTox86(sexped)
   assemble(target, basename)
 }
 
-def replaceMeWithTheActualCompilation(prog: SExp): Program = {
-  val parsed = LVarReader.fromSExpToModule(prog)
-  val withOutComplexOperands = simplifyModule(parsed)
-  val InstrsWithVar = selectInstructions(withOutComplexOperands)
+def transformTox86(prog: SExp): Program = {
+  val parsed = LIfReader.fromSExpToModule(prog)
+  val shrinked = shrinkModule(parsed)
+  val withOutComplexOperands = simplifyModule(shrinked)
+  val explicatedControl = explicateControl(withOutComplexOperands)
+  val InstrsWithVar = selectInstructions(explicatedControl)
   val (instrsWithHome, stackSpace) = assignHomes(InstrsWithVar)
   val patchedInstrs = patchInstructions(instrsWithHome)
   val finalProg = preludeAndConclusion(patchedInstrs, stackSpace)
-
-  x86.Program(Map("main" -> finalProg))
+  finalProg
 }
 
 def readFile(path: Path): String = {

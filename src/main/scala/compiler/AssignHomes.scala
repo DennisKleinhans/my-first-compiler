@@ -16,17 +16,39 @@ type Locations = Map[Identifier, Int]
   * @return
   *   A list of concrete x86 instructions with resolved memory locations.
   */
-def assignHomes(instrs: List[x86Var.Instr]): (List[x86.Instr], Int) = {
-  // Initial values: empty instruction list, empty locations map, and offset starting at -8
-  val (finalInstrs, _, finalOffset) =
-    instrs.foldLeft((List.empty[x86.Instr], Map.empty[Identifier, Int], -8)) {
-      case ((translatedInstrs, currentLocations, currentOffset), instr) =>
-        val (translatedInstr, updatedLocations, updatedOffset) =
-          assignInstr(instr, currentLocations, currentOffset)
-        (translatedInstrs :+ translatedInstr, updatedLocations, updatedOffset)
-    }
+def assignHomes(program: x86VarIf.Program): (x86.Program, Int) = {
+  val x86VarIf.Program(blocks) = program
+
+  val (finalBlocks, _, finalOffset) = blocks.foldLeft(
+    (Map.empty[String, List[x86.Instr]], Map.empty[Identifier, Int], -8)
+  ) {
+    case ((processedBlocks, globalLocations, currentOffset), (blockName, instrs)) => 
+      val (blockInstrs, updateddLocations, updatedOffset) = 
+        instrs.foldLeft((List.empty[x86.Instr], globalLocations, currentOffset)){
+          case ((translatedInstrs, currentLocations, currentOffset), instr) => 
+            val (translatedInstr, updatedLocations, updatedOffset) =
+              assignInstr(instr, currentLocations, currentOffset)
+            (translatedInstrs :+ translatedInstr, updatedLocations, updatedOffset)
+        }
+      
+      val updatedBlocks = processedBlocks.updated(blockName, blockInstrs)
+      (updatedBlocks, updateddLocations, updatedOffset)
+  }
+
   val stackSpace = -finalOffset
-  (finalInstrs, stackSpace)
+  (x86.Program(finalBlocks), stackSpace)
+
+
+  // Initial values: empty instruction list, empty locations map, and offset starting at -8
+  // val (finalInstrs, _, finalOffset) =
+  //   instrs.foldLeft((List.empty[x86.Instr], Map.empty[Identifier, Int], -8)) {
+  //     case ((translatedInstrs, currentLocations, currentOffset), instr) =>
+  //       val (translatedInstr, updatedLocations, updatedOffset) =
+  //         assignInstr(instr, currentLocations, currentOffset)
+  //       (translatedInstrs :+ translatedInstr, updatedLocations, updatedOffset)
+  //   }
+  // val stackSpace = -finalOffset
+  // (finalInstrs, stackSpace)
 }
 
 /** Translates an abstract argument into a concrete one, allocating a new stack
@@ -43,29 +65,16 @@ def assignHomes(instrs: List[x86Var.Instr]): (List[x86.Instr], Int) = {
   *   the updated next free offset.
   */
 private def assignArg(
-    arg: x86Var.Arg,
+    arg: x86VarIf.Arg,
     locations: Locations,
     nextFreeOffset: Int
 ): (x86.Location | x86.Immediate, Locations, Int) = arg match {
-  case x86Var.Immediate(n) =>
+  case x86VarIf.Immediate(n) =>
     // Constants are translated directly
     (x86.Immediate(n), locations, nextFreeOffset)
 
-  case x86Var.Variable(id) =>
-    // If the variable has already been assigned a stack slot, reuse it
-    locations.get(id) match {
-      case Some(offset) =>
-        (x86.Deref(x86.Reg.Rbp, offset), locations, nextFreeOffset)
-      case None =>
-        // Assign a new slot: stack grows downward in memory
-        val newOffset = nextFreeOffset - 8
-        val updatedLocations = locations.updated(id, newOffset)
-        (x86.Deref(x86.Reg.Rbp, newOffset), updatedLocations, newOffset)
-    }
-
-  case reg: x86.Reg =>
-    // Registers are left unchanged
-    (reg, locations, nextFreeOffset)
+  case loc: x86VarIf.Location =>
+    assignLocation(loc, locations, nextFreeOffset)
 }
 
 /** Resolves a variable location to its stack offset, allocating a new slot if
@@ -82,11 +91,11 @@ private def assignArg(
   *   updated next free offset.
   */
 def assignLocation(
-    loc: x86Var.Location,
+    loc: x86VarIf.Location,
     locations: Locations,
     nextFreeOffset: Int
 ): (x86.Location, Locations, Int) = loc match {
-  case x86Var.Variable(id) =>
+  case x86VarIf.Variable(id) =>
     locations.get(id) match {
       case Some(offset) =>
         (x86.Deref(x86.Reg.Rbp, offset), locations, nextFreeOffset)
@@ -97,6 +106,15 @@ def assignLocation(
     }
   case reg: x86.Reg =>
     (reg, locations, nextFreeOffset)
+
+  case byteReg: x86.ByteReg =>
+    (byteReg, locations, nextFreeOffset)
+
+  case deref: x86.Deref =>
+    (deref, locations, nextFreeOffset)
+
+  case global: x86.Global =>
+    (global, locations, nextFreeOffset)
 }
 
 /** Translates a single instruction from x86Var to x86, resolving all arguments.
@@ -112,11 +130,11 @@ def assignLocation(
   *   updated next offset.
   */
 def assignInstr(
-    instr: x86Var.Instr,
+    instr: x86VarIf.Instr,
     locations: Locations,
     nextFreeOffset: Int
 ): (x86.Instr, Locations, Int) = instr match {
-  case x86Var.MovQ(src, dest) =>
+  case x86VarIf.MovQ(src, dest) =>
     // Process both source and destination arguments
     val (srcArg, updatedLocations1, offset1) =
       assignArg(src, locations, nextFreeOffset)
@@ -124,39 +142,66 @@ def assignInstr(
       assignLocation(dest, updatedLocations1, offset1)
     (x86.Instr.MovQ(srcArg, destLoc), updatedLocations2, offset2)
 
-  case x86Var.AddQ(src, dest) =>
+  case x86VarIf.AddQ(src, dest) =>
     val (srcArg, updatedLocations1, offset1) =
       assignArg(src, locations, nextFreeOffset)
     val (destLoc, updatedLocations2, offset2) =
       assignLocation(dest, updatedLocations1, offset1)
     (x86.Instr.AddQ(srcArg, destLoc), updatedLocations2, offset2)
 
-  case x86Var.SubQ(src, dest) =>
+  case x86VarIf.SubQ(src, dest) =>
     val (srcArg, updatedLocations1, offset1) =
       assignArg(src, locations, nextFreeOffset)
     val (destLoc, updatedLocations2, offset2) =
       assignLocation(dest, updatedLocations1, offset1)
     (x86.Instr.SubQ(srcArg, destLoc), updatedLocations2, offset2)
 
-  case x86Var.NegQ(arg) =>
+  case x86VarIf.NegQ(arg) =>
     val (destLoc, updatedLocations, updatedOffset) =
       assignLocation(arg, locations, nextFreeOffset)
     (x86.Instr.NegQ(destLoc), updatedLocations, updatedOffset)
 
-  case x86Var.CallQ(label, arity) =>
+  case x86VarIf.CallQ(label, arity) =>
     // Calls do not need variable resolution
     (x86.Instr.CallQ(label, arity), locations, nextFreeOffset)
 
-  case x86Var.PushQ(arg) =>
+  case x86VarIf.PushQ(arg) =>
     val (resolvedArg, updatedLocations, updatedOffset) =
       assignArg(arg, locations, nextFreeOffset)
     (x86.Instr.PushQ(resolvedArg), updatedLocations, updatedOffset)
 
-  case x86Var.PopQ(arg) =>
+  case x86VarIf.PopQ(arg) =>
     val (resolvedArg, updatedLocations, updatedOffset) =
       assignArg(arg, locations, nextFreeOffset)
     (x86.Instr.PopQ(resolvedArg), updatedLocations, updatedOffset)
 
-  case x86Var.RetQ =>
+  case x86VarIf.RetQ =>
     (x86.Instr.RetQ, locations, nextFreeOffset)
+
+  case x86VarIf.CmpQ(lower, higher) =>
+    val (lowerArg, updatedLocations1, offset1) =
+      assignArg(lower, locations, nextFreeOffset)
+    val (higherArg, updatedLocations2, offset2) =
+      assignArg(higher, updatedLocations1, offset1)
+    (x86.Instr.CmpQ(lowerArg, higherArg), updatedLocations2, offset2)
+
+  case x86VarIf.MovZBQ(src, dest) =>
+    val (srcArg, updatedLocations1, offset1) =
+      assignArg(src, locations, nextFreeOffset)
+    val (destLoc, updatedLocations2, offset2) =
+      assignLocation(dest, updatedLocations1, offset1)
+    (x86.Instr.MovZBQ(srcArg, destLoc), updatedLocations2, offset2)
+
+  case x86VarIf.Jmp(label) =>
+    (x86.Instr.Jmp(label), locations, nextFreeOffset)
+
+  case x86VarIf.JmpIf(cc, label) =>
+    (x86.Instr.JmpIf(cc, label), locations, nextFreeOffset)
+
+  case x86VarIf.Set(cc, dest) =>
+    val (destLoc, updatedLocations, updatedOffset) =
+      assignLocation(dest, locations, nextFreeOffset)
+    (x86.Instr.Set(cc, destLoc), updatedLocations, updatedOffset)
+
+  case other => sys error "this instruction is yet not supported: " + other
 }
