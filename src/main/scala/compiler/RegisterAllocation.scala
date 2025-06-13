@@ -195,15 +195,6 @@ object RegisterAllocation {
       g = g ++ interferenceGraph(instrs)
     }
 
-    // 2) Alle Locations (aus liveAfter und defs) als Knoten sicherstellen
-    val allLocs: Set[x86VarIf.Location] =
-      prog.blocks.values.to(Set).flatMap { block =>
-        block.instructions.flatMap { case (instr, liveAfter) =>
-          liveAfter ++ written(instr)
-        }
-      }
-    allLocs.foreach(loc => g = g ++ Graph.vertex(loc))
-
     g
 
   /** Generates an interference graph from a list of instructions and their live
@@ -221,12 +212,18 @@ object RegisterAllocation {
   def interferenceGraph(
       instrs: List[(Instr, Set[x86VarIf.Location])]
   ): Graph[x86VarIf.Location] =
+
+    def isTemp(loc: x86VarIf.Location): Boolean = loc match {
+      case _: x86VarIf.Variable => true
+      case _                    => false
+    }
+
     var g = Graph.empty[x86VarIf.Location]
     for ((instr, liveAfter) <- instrs) {
-      val defs = written(instr)
+      val defs = written(instr).filter(isTemp)
       for {
         d <- defs
-        v <- liveAfter if d != v
+        v <- liveAfter.filter(isTemp) if d != v
       }
         g = g ++ Graph.edge(d, v)
     }
