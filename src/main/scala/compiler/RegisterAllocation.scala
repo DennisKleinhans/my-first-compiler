@@ -175,4 +175,61 @@ object RegisterAllocation {
     }
   }
 
+  /** Generates an interference graph for the given x86VarIf.Program. This graph
+    * represents the interference between variables based on their live ranges
+    * and definitions.
+    *
+    * @param prog
+    *   The x86VarIf.Program to analyze, which contains a set of blocks with
+    *   instructions and their live ranges.
+    * @return
+    *   A Graph where vertices are x86VarIf.Location and edges represent
+    *   interference between them (i.e., if two locations are live at the same
+    *   time, they are connected by an edge).
+    */
+  def interferenceGraph(
+      prog: analyzed.Program[Set[x86VarIf.Location], x86VarIf.Instr]
+  ): Graph[x86VarIf.Location] =
+    var g: Graph[x86VarIf.Location] = Graph.empty
+    prog.blocks.foreach { case (_, analyzed.Block(_, instrs)) =>
+      g = g ++ interferenceGraph(instrs)
+    }
+
+    // 2) Alle Locations (aus liveAfter und defs) als Knoten sicherstellen
+    val allLocs: Set[x86VarIf.Location] =
+      prog.blocks.values.to(Set).flatMap { block =>
+        block.instructions.flatMap { case (instr, liveAfter) =>
+          liveAfter ++ written(instr)
+        }
+      }
+    allLocs.foreach(loc => g = g ++ Graph.vertex(loc))
+
+    g
+
+  /** Generates an interference graph from a list of instructions and their live
+    * ranges. Each instruction is paired with a set of locations that are live
+    * after the instruction.
+    *
+    * @param instrs
+    *   List of tuples where each tuple contains an instruction and a set of
+    *   live locations after that instruction.
+    * @return
+    *   A Graph where vertices are x86VarIf.Location and edges represent
+    *   interference between them (i.e., if two locations are live at the same
+    *   time, they are connected by an edge).
+    */
+  def interferenceGraph(
+      instrs: List[(Instr, Set[x86VarIf.Location])]
+  ): Graph[x86VarIf.Location] =
+    var g = Graph.empty[x86VarIf.Location]
+    for ((instr, liveAfter) <- instrs) {
+      val defs = written(instr)
+      for {
+        d <- defs
+        v <- liveAfter if d != v
+      }
+        g = g ++ Graph.edge(d, v)
+    }
+    g
+
 }
