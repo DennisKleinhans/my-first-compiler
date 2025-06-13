@@ -31,16 +31,39 @@ object LabelGenerator {
     blockCounter += 1
     name + blockCounter
 
+  /** Produce a fresh label for a condition or predicate block.
+    *
+    * @param name
+    *   A prefix for the label (e.g. "cond", "pred"). Defaults to "cond".
+    * @return
+    *   A new label of the form `nameN` where `N` is the next unused integer.
+    */
   def freshCondLable(name: String = "cond"): CIf.Label = {
     condCounter += 1
     name + condCounter
   }
 
+  /** Produce a fresh label for a "done" block, which is typically the end of a
+    * loop or conditional.
+    *
+    * @param name
+    *   A prefix for the label (e.g. "done"). Defaults to "done".
+    * @return
+    *   A new label of the form `nameN` where `N` is the next unused integer.
+    */
   def freshDoneLabel(name: String = "done"): CIf.Label = {
     doneCounter += 1
     name + doneCounter
   }
 
+  /** Produce a fresh label for a body block, which is typically used in the
+    * context of loops or conditionals.
+    *
+    * @param name
+    *   A prefix for the label (e.g. "body"). Defaults to "body".
+    * @return
+    *   A new label of the form `nameN` where `N` is the next unused integer.
+    */
   def freshBodyLabel(name: String = "body"): CIf.Label = {
     bodyCounter += 1
     name + bodyCounter

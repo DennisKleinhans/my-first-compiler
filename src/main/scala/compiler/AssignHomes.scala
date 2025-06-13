@@ -37,18 +37,6 @@ def assignHomes(program: x86VarIf.Program): (x86.Program, Int) = {
 
   val stackSpace = -finalOffset
   (x86.Program(finalBlocks), stackSpace)
-
-
-  // Initial values: empty instruction list, empty locations map, and offset starting at -8
-  // val (finalInstrs, _, finalOffset) =
-  //   instrs.foldLeft((List.empty[x86.Instr], Map.empty[Identifier, Int], -8)) {
-  //     case ((translatedInstrs, currentLocations, currentOffset), instr) =>
-  //       val (translatedInstr, updatedLocations, updatedOffset) =
-  //         assignInstr(instr, currentLocations, currentOffset)
-  //       (translatedInstrs :+ translatedInstr, updatedLocations, updatedOffset)
-  //   }
-  // val stackSpace = -finalOffset
-  // (finalInstrs, stackSpace)
 }
 
 /** Translates an abstract argument into a concrete one, allocating a new stack

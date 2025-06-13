@@ -90,9 +90,10 @@ def lowerStmt(stmt: CIf.Stmt): List[x86VarIf.Instr] = stmt match
       // If we could eliminate this case here, we could produce better code an discard unnecessary assignments to tmp variables
       case CIf.Compare(cmp, e1, e2) =>
         val cc = ccFromCompareOperator(cmp)
-        val (arg1, arg2) = (argFromAtom(e2), argFromAtom(e1))
+        val src = argFromAtom(e2)
+        val dest = argFromAtom(e1)
         List(
-          x86VarIf.CmpQ(arg1, arg2),
+          x86VarIf.CmpQ(src, dest),
           x86VarIf.Set(cc, ByteReg.Al),
           x86VarIf.MovZBQ(ByteReg.Al, x86VarIf.Variable(id))
         )
@@ -151,9 +152,10 @@ def lowerTail(tail: CIf.Tail): List[x86VarIf.Instr] = tail match
 
   case CIf.If(cmp, thenGoto, elseGoto) =>
     val cc = ccFromCompareOperator(cmp.cmp)
-    val (arg1, arg2) = (argFromAtom(cmp.rhs), argFromAtom(cmp.lhs))
+    val src = argFromAtom(cmp.rhs)
+    val dest = argFromAtom(cmp.lhs)
     List(
-      x86VarIf.CmpQ(arg1, arg2),
+      x86VarIf.CmpQ(src, dest),
       x86VarIf.JmpIf(cc, thenGoto.lable),
       x86VarIf.Jmp(elseGoto.lable)
     )

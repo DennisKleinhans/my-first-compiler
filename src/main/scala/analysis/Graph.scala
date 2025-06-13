@@ -43,6 +43,7 @@ object Graph {
   def empty[V]: Graph[V] = Graph(Map.empty)
   def vertex[V](loc: V): Graph[V] = Graph(Map(loc -> Set.empty))
   def edge[V](loc1: V, loc2: V): Graph[V] = Graph(Map(loc1 -> Set(loc2), loc2 -> Set(loc1)))
+  def directedEdge[V](loc1: V, loc2: V): Graph[V] = Graph(Map(loc1 -> Set(loc2)))
 }
 
 object graphviz {
