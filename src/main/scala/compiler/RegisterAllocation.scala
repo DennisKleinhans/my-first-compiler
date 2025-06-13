@@ -87,4 +87,92 @@ object RegisterAllocation {
     g
   }
 
+  /** Reads an argument and returns the set of locations it reads.
+    *
+    * @param arg
+    *   The argument to read, which can be a location or an immediate value.
+    * @return
+    *   A set of locations that the argument reads. If the argument is an
+    *   immediate, it returns an empty set, as immediate values do not read any
+    *   locations.
+    */
+  def readArg(arg: x86VarIf.Arg): Set[x86VarIf.Location] = arg match {
+    case loc: x86VarIf.Location  => Set(loc)
+    case imm: x86VarIf.Immediate => Set.empty
+  }
+
+  /** Reads the locations accessed by the given instruction.
+    *
+    * @param instr
+    *   The instruction to analyze, which can be any x86VarIf.Instr.
+    * @return
+    *   A set of locations that the instruction reads.
+    */
+  def read(instr: x86VarIf.Instr): Set[x86VarIf.Location] = instr match
+    case Instr.MovQ(src, dest) => readArg(src)
+    case Instr.AddQ(src, dest) => readArg(src) ++ readArg(dest)
+    case Instr.SubQ(src, dest) => readArg(src) ++ readArg(dest)
+    case Instr.NegQ(arg)       => readArg(arg)
+    case Instr.CallQ("print_int", arity) =>
+      Set(Rdi) // only Rdi is used for print
+    case Instr.PushQ(arg)          => readArg(arg)
+    case Instr.PopQ(arg)           => Set.empty
+    case Instr.RetQ                => Set(Rax) // Ret reads Rax
+    case Instr.CmpQ(lower, higher) => readArg(lower) ++ readArg(higher)
+    case Instr.MovZBQ(src, dest)   => readArg(src)
+    case Instr.Jmp(label)          => Set.empty
+    case Instr.JmpIf(cc, label)    => Set.empty
+    case Instr.Set(cc, dest)       => Set.empty
+    case _                         => Set.empty
+
+  /** Returns the set of locations that are written by the given instruction.
+    *
+    * @param instr
+    *   The instruction to analyze, which can be any x86VarIf.Instr.
+    * @return
+    *   A set of locations that the instruction writes to.
+    */
+  def written(instr: x86VarIf.Instr): Set[x86VarIf.Location] = instr match
+    case Instr.MovQ(src, dest) => Set(dest)
+    case Instr.AddQ(src, dest) => Set(dest)
+    case Instr.SubQ(src, dest) => Set(dest)
+    case Instr.NegQ(arg)       => Set(arg)
+    case Instr.CallQ(lable, arity) =>
+      Set(Rax, Rcx, Rdx, Rsi, Rdi, R8, R9, R10, R11)
+    case Instr.PushQ(arg)          => Set(Rsp)
+    case Instr.PopQ(arg)           => readArg(arg) ++ Set(Rsp)
+    case Instr.RetQ                => Set.empty
+    case Instr.CmpQ(lower, higher) => Set.empty
+    case Instr.MovZBQ(src, dest)   => Set(dest)
+    case Instr.Jmp(label)          => Set.empty
+    case Instr.JmpIf(cc, label)    => Set.empty
+    case Instr.Set(cc, dest)       => Set(dest)
+    case _                         => Set.empty
+
+  /** Performs a backward data-flow analysis to uncover live variables in the
+    * given x86VarIf.Program.
+    *
+    * @param program
+    *   The x86VarIf.Program to analyze, which contains a set of blocks with
+    *   instructions.
+    * @return
+    *   An analyzed.Program where each instruction is annotated with a set of
+    *   live locations after the instruction.
+    */
+  def uncoverLive(
+      program: x86VarIf.Program
+  ): analyzed.Program[Set[x86VarIf.Location], x86VarIf.Instr] = {
+
+    backwards[Set[x86VarIf.Location], x86VarIf.Instr](
+      blocks = program.blocks,
+      graph = basicblockGraph(program),
+      bottom = Set.empty[x86VarIf.Location],
+      join = _ ++ _,
+      iota = Set(Rax, Rsp),
+      extrema = Set("conclusion")
+    ) { (instr, liveAfter) =>
+      (liveAfter -- written(instr)) ++ read(instr)
+    }
+  }
+
 }
