@@ -12,19 +12,21 @@ import compiler.x86VarIf.Immediate
 
 object RegisterAllocation {
 
+  // discrad caller saved registers as to not risk overwriting them
+  // TODO: thats not optimal and should be changed to save them on the stack and restore them after the call
   val registerColors: Coloring[x86VarIf.Location] = Map(
     R15 -> -5,
-    R11 -> -4,
+    // R11 -> -4,
     Rbp -> -3,
     Rsp -> -2,
-    Rax -> -1,
-    Rcx -> 0,
-    Rdx -> 1,
-    Rsi -> 2,
-    Rdi -> 3,
-    R8 -> 4,
-    R9 -> 5,
-    R10 -> 6,
+    // Rax -> -1,
+    // Rcx -> 0,
+    // Rdx -> 1,
+    // Rsi -> 2,
+    // Rdi -> 3,
+    // R8 -> 4,
+    // R9 -> 5,
+    // R10 -> 6,
     Rbx -> 7,
     R12 -> 8,
     R13 -> 9,
@@ -175,6 +177,11 @@ object RegisterAllocation {
     }
   }
 
+  private def isTemp(loc: x86VarIf.Location): Boolean = loc match {
+    case _: x86VarIf.Variable => true
+    case _                    => false
+  }
+
   /** Generates an interference graph for the given x86VarIf.Program. This graph
     * represents the interference between variables based on their live ranges
     * and definitions.
@@ -195,6 +202,16 @@ object RegisterAllocation {
       g = g ++ interferenceGraph(instrs)
     }
 
+    val allTemps = prog.blocks.values.to(Set).flatMap { block =>
+      block.instructions.flatMap { case (instr, liveAfter) =>
+        (liveAfter ++ written(instr)).filter(isTemp)
+      }
+    }
+    // 3) Füge sie als einzelne Vertices hinzu
+    allTemps.foreach { loc =>
+      g = g ++ Graph.vertex(loc)
+    }
+
     g
 
   /** Generates an interference graph from a list of instructions and their live
@@ -213,11 +230,6 @@ object RegisterAllocation {
       instrs: List[(Instr, Set[x86VarIf.Location])]
   ): Graph[x86VarIf.Location] =
 
-    def isTemp(loc: x86VarIf.Location): Boolean = loc match {
-      case _: x86VarIf.Variable => true
-      case _                    => false
-    }
-
     var g = Graph.empty[x86VarIf.Location]
     for ((instr, liveAfter) <- instrs) {
       val defs = written(instr).filter(isTemp)
@@ -229,4 +241,150 @@ object RegisterAllocation {
     }
     g
 
+  /** Assigns homes to variables based on their coloring.
+    *
+    * @param coloring
+    *   A mapping from x86VarIf.Location to Color, where each location is
+    *   assigned a color representing its register or spill location.
+    * @return
+    *   A mapping from x86VarIf.Variable to x86VarIf.Location, where each
+    *   variable is assigned a home location (either a physical register or a
+    *   spill location).
+    */
+  def homesFor(
+      coloring: Map[x86VarIf.Location, Color]
+  ): Map[x86VarIf.Variable, x86VarIf.Location] = {
+    // Inverted mapping: ColorID -> physical register
+    val colorToReg: Map[Color, x86VarIf.Location] =
+      registerColors.map { case (reg, col) => (col, reg) }
+
+    // Fold over variables to assign homes
+    coloring.keys
+      .collect { case v: x86VarIf.Variable => v }
+      .foldLeft((0, Map.empty[x86VarIf.Variable, x86VarIf.Location])) {
+        case ((spillIdx, acc), v) =>
+          coloring(v) match {
+            case col if colorToReg.contains(col) =>
+              (spillIdx, acc + (v -> colorToReg(col)))
+            case _ =>
+              val offset = -(spillIdx + 1) * 8
+              val home = x86.Deref(x86.Reg.Rbp, offset)
+              (spillIdx + 1, acc + (v -> home))
+          }
+      }
+      ._2
+  }
+
+  /** Assigns homes to variables in the given x86VarIf.Program based on the
+    * provided mapping of variables to locations. It rewrites the instructions
+    * to use the assigned homes, replacing variables with their corresponding
+    * locations (either registers or spill locations).
+    *
+    * @param program
+    *   The x86VarIf.Program to rewrite, which contains a set of blocks with
+    *   instructions.
+    * @param homes
+    *   A mapping from x86VarIf.Variable to x86VarIf.Location, where each
+    *   variable is assigned a home location (either a physical register or a
+    *   spill location).
+    * @return
+    *   A tuple containing the rewritten x86.Program and the maximum spill
+    *   offset used in the program.
+    */
+  def assignHomes(
+      program: x86VarIf.Program,
+      homes: Map[x86VarIf.Variable, x86VarIf.Location]
+  ): (x86.Program, Int) = {
+    var maxSpillOffset = 0L
+
+    def rewriteArg(arg: x86VarIf.Arg): x86.Arg = arg match {
+      case x86VarIf.Immediate(n) => x86.Immediate(n)
+      case reg: x86.Reg          => reg
+      case byteReg: x86.ByteReg  => byteReg
+      case deref: x86.Deref =>
+        sys error s"Unexpected deref: $deref in assignHomes (rewriteArg)"
+      case global: x86.Global =>
+        sys error s"Unexpected global: $global in assignHomes (rewriteArg)"
+      case variable: x86VarIf.Variable =>
+        homes.get(variable) match
+          case Some(location) =>
+            location match {
+              case reg: x86.Reg => reg
+              case spill @ x86.Deref(_, offset) =>
+                maxSpillOffset = math.max(maxSpillOffset, -offset)
+                spill
+              case other =>
+                sys.error(s"Unexpected location for variable $variable: $other")
+            }
+
+          case None =>
+            sys.error(s"Variable $variable has no home assigned")
+
+    }
+
+    def rewriteLocation(loc: x86VarIf.Location): x86.Location = loc match {
+      case variable: x86VarIf.Variable =>
+        rewriteArg(variable).asInstanceOf[x86.Location]
+      case reg: x86.Reg         => reg
+      case byteReg: x86.ByteReg => byteReg
+      case other                => sys.error(s"Unexpected location: $other")
+    }
+
+    def rewritInstr(instr: x86VarIf.Instr): x86Instr = instr match {
+      case x86VarIf.MovQ(src, dest) =>
+        x86Instr.MovQ(rewriteArg(src), rewriteLocation(dest))
+      case x86VarIf.AddQ(src, dest) =>
+        x86Instr.AddQ(rewriteArg(src), rewriteLocation(dest))
+      case x86VarIf.SubQ(src, dest) =>
+        x86Instr.SubQ(rewriteArg(src), rewriteLocation(dest))
+      case x86VarIf.NegQ(arg) =>
+        x86Instr.NegQ(rewriteLocation(arg))
+      case x86VarIf.CallQ(label, arity) =>
+        x86Instr.CallQ(label, arity)
+      case x86VarIf.PushQ(arg) =>
+        x86Instr.PushQ(rewriteArg(arg))
+      case x86VarIf.PopQ(arg) =>
+        x86Instr.PopQ(rewriteArg(arg))
+      case x86VarIf.RetQ => x86Instr.RetQ
+      case x86VarIf.CmpQ(lower, higher) =>
+        x86Instr.CmpQ(rewriteArg(lower), rewriteArg(higher))
+      case x86VarIf.MovZBQ(src, dest) =>
+        x86Instr.MovZBQ(rewriteArg(src), rewriteLocation(dest))
+      case x86VarIf.Set(cc, dest)    => x86Instr.Set(cc, rewriteLocation(dest))
+      case x86VarIf.Jmp(label)       => x86Instr.Jmp(label)
+      case x86VarIf.JmpIf(cc, label) => x86Instr.JmpIf(cc, label)
+
+      case _ => sys.error(s"Unsupported instruction: $instr")
+    }
+
+    val rewrittenBlocks = program.blocks.map { case (label, instrs) =>
+      label -> instrs.map(rewritInstr)
+    }
+    (x86.Program(rewrittenBlocks), maxSpillOffset.toInt)
+
+  }
+
+  /** Allocates registers for the given x86VarIf.Program using a graph-based
+    * register allocation algorithm. It first uncovers live variables, builds an
+    * interference graph, colors the graph using the DSATUR algorithm, and then
+    * assigns homes to variables based on the coloring. The result is a tuple
+    * containing the rewritten x86.Program with assigned homes and the maximum
+    * spill offset used in the program.
+    *
+    * @param program
+    *   The x86VarIf.Program to allocate registers for, which contains a set of
+    *   blocks with instructions.
+    * @return
+    *   A tuple containing the rewritten x86.Program with assigned homes and the
+    *   maximum spill offset used in the program.
+    */
+  def allocateRegisters(
+      program: x86VarIf.Program
+  ): (x86.Program, Int) = {
+    val liveProg = uncoverLive(program)
+    val graph = interferenceGraph(liveProg)
+    val coloring = dsatur(graph, Map.empty)
+    val homes = homesFor(coloring)
+    assignHomes(program, homes)
+  }
 }

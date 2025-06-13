@@ -22,7 +22,8 @@ def preludeAndConclusion(
     stackSpace: Int
 ): x86.Program =
   val x86.Program(blocks) = program
-  val alignedSpace = ((stackSpace + 15) / 16) * 16
+  val alignedSpace =
+    if stackSpace == 0 then 16 else ((stackSpace + 15) / 16) * 16
 
   val mainBlock = List(PushQ(Reg.Rbp)) ++
     List(

@@ -9,6 +9,8 @@ import x86.assemble
 
 import java.nio.file.{Path, Paths}
 import scala.io.StdIn
+import compiler.RegisterAllocation.*
+import analysis.*
 
 @main
 def main(): Unit =
@@ -16,29 +18,58 @@ def main(): Unit =
   // compile(Paths.get(path))
   val parsed = parse(
     """
-  if 1==1 then 1+1 else 2+2
+x = 0
+while (x < 3) {
+  print(x)
+  x = x + 1
+}
   """
   )
 
-  
+  val prog = selectInstructions(
+    explicateControl(
+      simplifyModule(shrinkModule(LIfReader.fromSExpToModule(parsed)))
+    )
+  )
 
-  println("after parse: " + parsed)
-  val sexped = LIfReader.fromSExpToModule(parsed)
-  println("after sexp: " + sexped)
-  val shrinked = shrinkModule(sexped)
-  println("after shrink: " + shrinked)
-  val removedComplex = simplifyModule(shrinked)
-  println("after removedComplexOperands: " + removedComplex)
-  val controlled = explicateControl(removedComplex)
-  println("after explicateControll: " + controlled)
-  val selctedInstructions = selectInstructions(controlled)
-  println("after selectInstructions: " + selctedInstructions)
-  val (assignedHomes, stackSpace) = assignHomes(selctedInstructions)
-  println("after assignHomes: " + assignedHomes)
-  val patchedInstructions = patchInstructions(assignedHomes)
-  println("after patchInstructions: " + patchedInstructions)
-  val finalProg = preludeAndConclusion(patchedInstructions, stackSpace)
-  println("after preludeAndConclusion: " + finalProg)
+  val live = uncoverLive(prog)
+  println("Live variables: " + live)
+  val interGraph = interferenceGraph(live)
+  println("Interference Graph: " + interGraph)
+  val coloring = dsatur(interGraph, Map.empty)
+  println("coloring: " + coloring)
+  val homes = homesFor(coloring)
+  println("homes: " + homes)
+  val assignedHomes = assignHomes(prog, homes)
+  println("assignedHomes: " + assignedHomes)
+
+  val graph = basicblockGraph(prog)
+  // println("selected instructions: " + prog)
+  println("Basic Block Graph: " + graph)
+  dumpGraph(
+    prog.blocks,
+    graph,
+    instr => instr.toString,
+    "graph.png"
+  )
+
+  // println("after parse: " + parsed)
+  // val sexped = LIfReader.fromSExpToModule(parsed)
+  // println("after sexp: " + sexped)
+  // val shrinked = shrinkModule(sexped)
+  // println("after shrink: " + shrinked)
+  // val removedComplex = simplifyModule(shrinked)
+  // println("after removedComplexOperands: " + removedComplex)
+  // val controlled = explicateControl(removedComplex)
+  // println("after explicateControll: " + controlled)
+  // val selctedInstructions = selectInstructions(controlled)
+  // println("after selectInstructions: " + selctedInstructions)
+  // val (assignedHomes, stackSpace) = allocateRegisters(selctedInstructions)
+  // println("after assignHomes: " + assignedHomes)
+  // val patchedInstructions = patchInstructions(assignedHomes)
+  // println("after patchInstructions: " + patchedInstructions)
+  // val finalProg = preludeAndConclusion(patchedInstructions, stackSpace)
+  // println("after preludeAndConclusion: " + finalProg)
 
 def compile(input: Path): Path = {
   val basename = input.getFileName.toString.replace(".lang", "")
@@ -54,7 +85,7 @@ def transformTox86(prog: SExp): Program = {
   val withOutComplexOperands = simplifyModule(shrinked)
   val explicatedControl = explicateControl(withOutComplexOperands)
   val InstrsWithVar = selectInstructions(explicatedControl)
-  val (instrsWithHome, stackSpace) = assignHomes(InstrsWithVar)
+  val (instrsWithHome, stackSpace) = allocateRegisters(InstrsWithVar)
   val patchedInstrs = patchInstructions(instrsWithHome)
   val finalProg = preludeAndConclusion(patchedInstrs, stackSpace)
   finalProg
