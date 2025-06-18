@@ -16,22 +16,24 @@ object RegisterAllocation {
   // TODO: thats not optimal and should be changed to save them on the stack and restore them after the call
   val registerColors: Coloring[x86VarIf.Location] = Map(
     R15 -> -5,
-    // R11 -> -4,
+    R11 -> -4,
     Rbp -> -3,
     Rsp -> -2,
-    // Rax -> -1,
-    // Rcx -> 0,
-    // Rdx -> 1,
-    // Rsi -> 2,
-    // Rdi -> 3,
-    // R8 -> 4,
-    // R9 -> 5,
-    // R10 -> 6,
+    Rax -> -1,
+    Rcx -> 0,
+    Rdx -> 1,
+    Rsi -> 2,
+    Rdi -> 3,
+    R8 -> 4,
+    R9 -> 5,
+    R10 -> 6,
     Rbx -> 7,
     R12 -> 8,
     R13 -> 9,
     R14 -> 10
   )
+
+  val callerSavedRegisters = Set(Rax, Rcx, Rdx, Rsi, Rdi, R8, R9, R10, R11)
 
   /** Builds a basic block graph from the given x86VarIf.Program. Each block is
     * represented by its label, and edges are created based on the control flow
@@ -294,9 +296,25 @@ object RegisterAllocation {
   def assignHomes(
       program: x86VarIf.Program,
       homes: Map[x86VarIf.Variable, x86VarIf.Location]
-  ): (x86.Program, Int) = {
+  ): (x86.Program, Long) = {
     var maxSpillOffset = 0L
 
+    // Rewrite CallQ instructions to save and restore caller-saved registers
+    // around the call, as they may be overwritten by the called function.
+    def wrapCall(call: x86Instr.CallQ): List[x86Instr] = {
+      val liveCallerSavedRegs = homes.values.collect {
+        case reg: x86.Reg if callerSavedRegisters contains reg => reg
+      }.toSet
+
+      val saves = liveCallerSavedRegs.toList.map(r => x86Instr.PushQ(r))
+      val restores =
+        liveCallerSavedRegs.toList.reverse.map(r => x86Instr.PopQ(r))
+
+      saves ++ (call :: Nil) ++ restores
+    }
+
+    // Rewrite arguments in instructions to use the assigned homes
+    // and spill locations, while also tracking the maximum spill offset used.
     def rewriteArg(arg: x86VarIf.Arg): x86.Arg = arg match {
       case x86VarIf.Immediate(n) => x86.Immediate(n)
       case reg: x86.Reg          => reg
@@ -322,6 +340,8 @@ object RegisterAllocation {
 
     }
 
+    // Rewrite locations in instructions to use the assigned homes
+    // and spill locations, while also tracking the maximum spill offset used.
     def rewriteLocation(loc: x86VarIf.Location): x86.Location = loc match {
       case variable: x86VarIf.Variable =>
         rewriteArg(variable).asInstanceOf[x86.Location]
@@ -330,37 +350,41 @@ object RegisterAllocation {
       case other                => sys.error(s"Unexpected location: $other")
     }
 
-    def rewritInstr(instr: x86VarIf.Instr): x86Instr = instr match {
+    // Rewrite each instruction in the program to use the assigned homes
+    // and spill locations, while also wrapping CallQ instructions.
+    // It returns a list of x86Instr, which are the rewritten instructions.
+    def rewriteInstr(instr: x86VarIf.Instr): List[x86Instr] = instr match {
       case x86VarIf.MovQ(src, dest) =>
-        x86Instr.MovQ(rewriteArg(src), rewriteLocation(dest))
+        x86Instr.MovQ(rewriteArg(src), rewriteLocation(dest)) :: Nil
       case x86VarIf.AddQ(src, dest) =>
-        x86Instr.AddQ(rewriteArg(src), rewriteLocation(dest))
+        x86Instr.AddQ(rewriteArg(src), rewriteLocation(dest)) :: Nil
       case x86VarIf.SubQ(src, dest) =>
-        x86Instr.SubQ(rewriteArg(src), rewriteLocation(dest))
+        x86Instr.SubQ(rewriteArg(src), rewriteLocation(dest)) :: Nil
       case x86VarIf.NegQ(arg) =>
-        x86Instr.NegQ(rewriteLocation(arg))
+        x86Instr.NegQ(rewriteLocation(arg)) :: Nil
       case x86VarIf.CallQ(label, arity) =>
-        x86Instr.CallQ(label, arity)
+        wrapCall(x86Instr.CallQ(label, arity))
       case x86VarIf.PushQ(arg) =>
-        x86Instr.PushQ(rewriteArg(arg))
+        x86Instr.PushQ(rewriteArg(arg)) :: Nil
       case x86VarIf.PopQ(arg) =>
-        x86Instr.PopQ(rewriteArg(arg))
-      case x86VarIf.RetQ => x86Instr.RetQ
+        x86Instr.PopQ(rewriteArg(arg)) :: Nil
+      case x86VarIf.RetQ => x86Instr.RetQ :: Nil
       case x86VarIf.CmpQ(lower, higher) =>
-        x86Instr.CmpQ(rewriteArg(lower), rewriteArg(higher))
+        x86Instr.CmpQ(rewriteArg(lower), rewriteArg(higher)) :: Nil
       case x86VarIf.MovZBQ(src, dest) =>
-        x86Instr.MovZBQ(rewriteArg(src), rewriteLocation(dest))
-      case x86VarIf.Set(cc, dest)    => x86Instr.Set(cc, rewriteLocation(dest))
-      case x86VarIf.Jmp(label)       => x86Instr.Jmp(label)
-      case x86VarIf.JmpIf(cc, label) => x86Instr.JmpIf(cc, label)
+        x86Instr.MovZBQ(rewriteArg(src), rewriteLocation(dest)) :: Nil
+      case x86VarIf.Set(cc, dest) =>
+        x86Instr.Set(cc, rewriteLocation(dest)) :: Nil
+      case x86VarIf.Jmp(label)       => x86Instr.Jmp(label) :: Nil
+      case x86VarIf.JmpIf(cc, label) => x86Instr.JmpIf(cc, label) :: Nil
 
       case _ => sys.error(s"Unsupported instruction: $instr")
     }
 
     val rewrittenBlocks = program.blocks.map { case (label, instrs) =>
-      label -> instrs.map(rewritInstr)
+      label -> instrs.flatMap(rewriteInstr)
     }
-    (x86.Program(rewrittenBlocks), maxSpillOffset.toInt)
+    (x86.Program(rewrittenBlocks), maxSpillOffset)
 
   }
 
@@ -380,7 +404,7 @@ object RegisterAllocation {
     */
   def allocateRegisters(
       program: x86VarIf.Program
-  ): (x86.Program, Int) = {
+  ): (x86.Program, Long) = {
     val liveProg = uncoverLive(program)
     val graph = interferenceGraph(liveProg)
     val coloring = dsatur(graph, Map.empty)

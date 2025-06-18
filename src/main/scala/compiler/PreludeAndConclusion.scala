@@ -19,7 +19,7 @@ import x86.Immediate
   */
 def preludeAndConclusion(
     program: x86.Program,
-    stackSpace: Int
+    stackSpace: Long
 ): x86.Program =
   val x86.Program(blocks) = program
   val alignedSpace =
