@@ -38,16 +38,16 @@ object LIfReader {
     * @throws java.lang.RuntimeException
     *   if the expression is invalid
     */
-  def fromSExpToExpr(sexp: SExp): LWhile.Expr = sexp match
+  def fromSExpToExpr(sexp: SExp): LCore.Expr = sexp match
     case Node(Symbol("Variable") :: Symbol(name) :: Nil) =>
-      LWhile.Variable(Identifier(name))
+      LCore.Variable(Identifier(name))
 
     case Node(Symbol("Constant") :: Number(n) :: Nil) =>
-      LWhile.Constant(n)
+      LCore.Constant(n)
 
-    case Node(Symbol("True") :: Nil) => LWhile.ConstantBool(true)
+    case Node(Symbol("True") :: Nil) => LCore.ConstantBool(true)
 
-    case Node(Symbol("False") :: Nil) => LWhile.ConstantBool(false)
+    case Node(Symbol("False") :: Nil) => LCore.ConstantBool(false)
 
     case Node(
           Symbol("Call") ::
@@ -55,7 +55,7 @@ object LIfReader {
           Node(Nil) ::
           Nil
         ) =>
-      LWhile.ReadIntCall
+      LCore.ReadIntCall
 
     case Node(
           Symbol("Call") :: Node(
@@ -65,42 +65,42 @@ object LIfReader {
       sys.error(s"Unknown function call: $name")
 
     case Node(Symbol("Unary") :: Symbol("Neg") :: e :: Nil) =>
-      LWhile.UnaryNumericOp(UnaryNumericOperator.USub, fromSExpToExpr(e))
+      LCore.UnaryNumericOp(UnaryNumericOperator.USub, fromSExpToExpr(e))
 
     case Node(Symbol("Binary") :: Symbol("Add") :: lhs :: rhs :: Nil) =>
-      LWhile.BinaryNumericOp(
+      LCore.BinaryNumericOp(
         BinaryNumericOperator.Add,
         fromSExpToExpr(lhs),
         fromSExpToExpr(rhs)
       )
 
     case Node(Symbol("Binary") :: Symbol("Sub") :: lhs :: rhs :: Nil) =>
-      LWhile.BinaryNumericOp(
+      LCore.BinaryNumericOp(
         BinaryNumericOperator.Sub,
         fromSExpToExpr(lhs),
         fromSExpToExpr(rhs)
       )
 
     case Node(Symbol("Binary") :: Symbol("And") :: e1 :: e2 :: Nil) =>
-      LWhile.BinaryLogicOp(
+      LCore.BinaryLogicOp(
         BinaryLogicOperator.And,
         fromSExpToExpr(e1),
         fromSExpToExpr(e2)
       )
 
     case Node(Symbol("Binary") :: Symbol("Or") :: e1 :: e2 :: Nil) =>
-      LWhile.BinaryLogicOp(
+      LCore.BinaryLogicOp(
         BinaryLogicOperator.And,
         fromSExpToExpr(e1),
         fromSExpToExpr(e2)
       )
 
     case Node(Symbol("Unary") :: Symbol("Not") :: e :: Nil) =>
-      LWhile.UnaryLogicOp(UnaryLogicOperator.Not, fromSExpToExpr(e))
+      LCore.UnaryLogicOp(UnaryLogicOperator.Not, fromSExpToExpr(e))
 
     // if expression
     case Node(Symbol("IfExp") :: test :: thenExpr :: elseExpr :: Nil) =>
-      LWhile.IfExpr(
+      LCore.IfExpr(
         fromSExpToExpr(test),
         fromSExpToExpr(thenExpr),
         fromSExpToExpr(elseExpr)
@@ -108,7 +108,7 @@ object LIfReader {
 
     // compare node
     case Node((Symbol("Binary") :: cmp :: e1 :: e2 :: Nil)) =>
-      LWhile.Compare(
+      LCore.Compare(
         fromSExpToCompareOperator(cmp),
         fromSExpToExpr(e1),
         fromSExpToExpr(e2)
@@ -126,9 +126,9 @@ object LIfReader {
     * @throws java.lang.RuntimeException
     *   if the statement is invalid
     */
-  def fromSExpToStmt(sexp: SExp): LWhile.Stmt = sexp match
+  def fromSExpToStmt(sexp: SExp): LCore.Stmt = sexp match
     case Node(Symbol("Assign") :: Symbol(name) :: assignExpr :: Nil) =>
-      LWhile.AssignStmt(Identifier(name), fromSExpToExpr(assignExpr))
+      LCore.AssignStmt(Identifier(name), fromSExpToExpr(assignExpr))
 
     case Node(
           Symbol("Expr") :: Node(
@@ -137,10 +137,10 @@ object LIfReader {
             Node(List(arg)) :: Nil
           ) :: Nil
         ) =>
-      LWhile.PrintStmt(fromSExpToExpr(arg))
+      LCore.PrintStmt(fromSExpToExpr(arg))
 
     case Node(Symbol("If") :: test :: Node(thn) :: Node(els) :: Nil) =>
-      LWhile.IfStmt(
+      LCore.IfStmt(
         fromSExpToExpr(test),
         thn.map(fromSExpToStmt),
         els.map(fromSExpToStmt)
@@ -149,10 +149,10 @@ object LIfReader {
     case Node(Symbol("Expr") :: exprNode :: Nil) =>
       fromSExpToExpr(exprNode) match
         case other =>
-          LWhile.ExprStmt(other)
+          LCore.ExprStmt(other)
 
     case Node(Symbol("While") :: test :: Node(body) :: Nil) =>
-      LWhile.WhileStmt(fromSExpToExpr(test), body.map(fromSExpToStmt))
+      LCore.WhileStmt(fromSExpToExpr(test), body.map(fromSExpToStmt))
 
     case other =>
       sys.error(s"invalid statement: $other")
@@ -166,13 +166,13 @@ object LIfReader {
     * @throws java.lang.RuntimeException
     *   if the S-Expression does not represent a valid `Module`
     */
-  def fromSExpToModule(sexp: SExp): LWhile.Module = sexp match
+  def fromSExpToModule(sexp: SExp): LCore.Module = sexp match
     case Node(Symbol("Module") :: rest) =>
       // rest may be a direct list of stmts or a single wrapper node
       val stmtNodes = rest match
         case List(Node(inner)) => inner
         case many              => many
-      LWhile.Module(stmtNodes.map(fromSExpToStmt))
+      LCore.Module(stmtNodes.map(fromSExpToStmt))
 
     case other =>
       sys.error(s"invalid module: $other")

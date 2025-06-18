@@ -57,7 +57,7 @@ object CommonNodes {
   * Represents the structure of LWhile programs after parsing and before
   * interpretation or compilation.
   */
-object LWhile {
+object LCore {
   import CommonNodes.*
   export Expr.*
   export Stmt.*
@@ -101,7 +101,7 @@ object LWhile {
   * Represents the structure of LMonWhile programs after parsing and before
   * interpretation or compilation.
   */
-object LMonWhile {
+object LMon {
   import CommonNodes.*
   import CommonNodes.Atom
   export Expr.*
@@ -114,8 +114,8 @@ object LMonWhile {
     */
   case class Module(stmts: List[Stmt])
 
-  /** A statement in LMonWhile represents either a standalone expression, a print
-    * operation, an assign operation, a if statement or a while statement.
+  /** A statement in LMonWhile represents either a standalone expression, a
+    * print operation, an assign operation, a if statement or a while statement.
     */
   enum Stmt:
     case AssignStmt(id: Identifier, rhs: Expr)
@@ -124,9 +124,9 @@ object LMonWhile {
     case IfStmt(cond: Expr, thenBranch: List[Stmt], elseBranch: List[Stmt])
     case WhileStmt(cond: Expr, body: List[Stmt])
 
-  /** An expression in LMonWhile can be a constant value (Long or Boolean), a unary
-    * operation, a binary operation, a function call with the restriction to
-    * only accept atoms or a if expression also with the restiction to only
+  /** An expression in LMonWhile can be a constant value (Long or Boolean), a
+    * unary operation, a binary operation, a function call with the restriction
+    * to only accept atoms or a if expression also with the restiction to only
     * accept atoms.
     */
   enum Expr:
@@ -151,7 +151,7 @@ object LMonWhile {
   * constructs, focusing on expressions, statements, and control flow with
   * if-else constructs.
   */
-object CIf {
+object CIr {
   import CommonNodes.*
   import CommonNodes.Atom
   export Tail.*
@@ -211,12 +211,12 @@ object CIf {
   * Represents the structure of LMonIf programs after instruction selection and
   * before final assembly generation.
   */
-object x86VarIf {
+object x86Var {
   import x86.Cc
   import CommonNodes.Identifier
   export Instr.*
 
-  case class Program(blocks: Map[String, List[x86VarIf.Instr]])
+  case class Program(blocks: Map[String, List[x86Var.Instr]])
 
   /*
    * An identifier in x86VarIf represents a variable name or label.
