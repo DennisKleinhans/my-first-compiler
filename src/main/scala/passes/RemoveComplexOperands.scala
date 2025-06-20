@@ -46,7 +46,7 @@ object RemoveComplexOperands {
     *   - a list of assignment statements computing intermediate results
     *   - the final simplified expression using only simple operands
     */
-  def simplifyExpr(
+  def removeComplexOperands(
       exp: LCore.Expr,
       gen: NameGenerator
   ): (List[LMon.AssignStmt], LMon.Expr) = exp match
@@ -58,7 +58,7 @@ object RemoveComplexOperands {
       (Nil, AtomExpr(Atom.Variable(Identifier(name))))
 
     case LCore.UnaryNumericOp(op, e) =>
-      val (assignments, atomExpr) = simplifyExpr(e, gen)
+      val (assignments, atomExpr) = removeComplexOperands(e, gen)
       val tmpIdentifier = gen.freshName()
       val newAssignment: LMon.AssignStmt =
         LMon.AssignStmt(
@@ -77,8 +77,8 @@ object RemoveComplexOperands {
       )
 
     case LCore.BinaryNumericOp(op, lhs, rhs) =>
-      val (assignmentsLeft, atomExprLeft) = simplifyExpr(lhs, gen)
-      val (assignmentsRight, atomExprRight) = simplifyExpr(rhs, gen)
+      val (assignmentsLeft, atomExprLeft) = removeComplexOperands(lhs, gen)
+      val (assignmentsRight, atomExprRight) = removeComplexOperands(rhs, gen)
       val tmpIdentifier = gen.freshName()
       val newAssignment: LMon.AssignStmt = LMon.AssignStmt(
         tmpIdentifier,
@@ -96,8 +96,8 @@ object RemoveComplexOperands {
       )
 
     case LCore.Compare(cmp, e1, e2) =>
-      val (assignmentsE1, atomExprE1) = simplifyExpr(e1, gen)
-      val (assignmentsE2, atomExprE2) = simplifyExpr(e2, gen)
+      val (assignmentsE1, atomExprE1) = removeComplexOperands(e1, gen)
+      val (assignmentsE2, atomExprE2) = removeComplexOperands(e2, gen)
       val simpleCompare = LMon.Compare(
         cmp,
         extractAtom(atomExprE1),
@@ -107,13 +107,13 @@ object RemoveComplexOperands {
       (assignmentsE1 ++ assignmentsE2, simpleCompare)
 
     case LCore.UnaryLogicOp(op, e) =>
-      val (assignments, simplifiedExpr) = simplifyExpr(e, gen)
+      val (assignments, simplifiedExpr) = removeComplexOperands(e, gen)
       (assignments, LMon.UnaryLogicOp(op, simplifiedExpr))
 
     case LCore.IfExpr(test, thn, els) =>
-      val (condAssignments, simpleCondExpr) = simplifyExpr(test, gen)
-      val (thenAssignments, simpleThenExpr) = simplifyExpr(thn, gen)
-      val (elseAssignments, simpleElseExpr) = simplifyExpr(els, gen)
+      val (condAssignments, simpleCondExpr) = removeComplexOperands(test, gen)
+      val (thenAssignments, simpleThenExpr) = removeComplexOperands(thn, gen)
+      val (elseAssignments, simpleElseExpr) = removeComplexOperands(els, gen)
 
       val simpleIfExpr =
         LMon.IfExpr(
@@ -141,7 +141,7 @@ object RemoveComplexOperands {
     /** Simplifies all expressions within a statement by extracting complex
       * subexpressions.
       *
-      * This function applies `simplifyExpr` to each expression inside the
+      * This function applies `removeComplexOperands` to each expression inside the
       * statement (whether it's an assignment, print, or standalone expression).
       * Any intermediate computations are lifted into separate assignment
       * statements.
@@ -152,17 +152,17 @@ object RemoveComplexOperands {
       *   a list of simplified statements, including any generated temporary
       *   assignments
       */
-  def simplifyStmt(
+  def removeComplexOperands(
       stmt: LCore.Stmt,
       gen: NameGenerator
   ): List[LMon.Stmt] =
     stmt match
       case LCore.ExprStmt(e) =>
-        val (assignments, expr) = simplifyExpr(e, gen)
+        val (assignments, expr) = removeComplexOperands(e, gen)
         assignments :+ LMon.ExprStmt(expr)
 
       case LCore.PrintStmt(e) =>
-        val (assignments, expr) = simplifyExpr(e, gen)
+        val (assignments, expr) = removeComplexOperands(e, gen)
         expr match
           case AtomExpr(a) =>
             assignments :+ LMon.PrintStmt(a)
@@ -174,13 +174,13 @@ object RemoveComplexOperands {
             )
 
       case LCore.AssignStmt(Identifier(name), e) =>
-        val (assignments, expr) = simplifyExpr(e, gen)
+        val (assignments, expr) = removeComplexOperands(e, gen)
         assignments :+ LMon.AssignStmt(Identifier(name), expr)
 
       case LCore.IfStmt(test, thn, els) =>
-        val (condAssignments, simpleCondExpr) = simplifyExpr(test, gen)
-        val simplifiedThenStmts = thn.flatMap(simplifyStmt(_, gen))
-        val simplifiedElseStmts = els.flatMap(simplifyStmt(_, gen))
+        val (condAssignments, simpleCondExpr) = removeComplexOperands(test, gen)
+        val simplifiedThenStmts = thn.flatMap(removeComplexOperands(_, gen))
+        val simplifiedElseStmts = els.flatMap(removeComplexOperands(_, gen))
 
         condAssignments :+ LMon.IfStmt(
           simpleCondExpr,
@@ -189,13 +189,10 @@ object RemoveComplexOperands {
         )
 
       case LCore.WhileStmt(test, body) =>
-        // 1) Test vereinfachen, aber Zuweisungen *nicht* vorziehen
-        val (condAssignments, simpleCondExpr) = simplifyExpr(test, gen)
+        val (condAssignments, simpleCondExpr) = removeComplexOperands(test, gen)
+        val simplifiedBodyStmts = body.flatMap(removeComplexOperands(_, gen))
 
-        // 2) Körper wie gehabt rekursiv simplifizieren
-        val simplifiedBodyStmts = body.flatMap(simplifyStmt(_, gen))
-
-        // 3) Nur noch eine WhileStmt zurückgeben – ohne condAssignments
+        // wrap the condition in a Begin to make sure also complex conditions (e.g x-1 < 3) are evaluated as a block and not just the last expression
         List(
           LMon.WhileStmt(
             LMon.Begin(condAssignments, simpleCondExpr),
@@ -206,7 +203,7 @@ object RemoveComplexOperands {
       /** Simplifies all statements in a module by flattening expressions
         * throughout.
         *
-        * Applies `simplifyStmt` to each statement in the module and combines
+        * Applies `removeComplexOperands` to each statement in the module and combines
         * all resulting statements into a new, fully simplified module.
         *
         * @param module
@@ -219,6 +216,6 @@ object RemoveComplexOperands {
       module: LCore.Module,
       gen: NameGenerator = NameGenerator()
   ): LMon.Module =
-    val simplifiedStmts = module.stmts.flatMap(simplifyStmt(_, gen))
+    val simplifiedStmts = module.stmts.flatMap(removeComplexOperands(_, gen))
     LMon.Module(simplifiedStmts)
 }

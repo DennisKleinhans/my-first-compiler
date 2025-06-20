@@ -80,7 +80,7 @@ class ParserTests extends FunSuite {
       expected: LCore.Expr
   ): Unit = {
     test(s"fromSExpToExpr - $name") {
-      assertEquals(LIfReader.fromSExpToExpr(input), expected)
+      assertEquals(LCoreReader.fromSExpToExpr(input), expected)
     }
   }
 
@@ -117,7 +117,7 @@ class ParserTests extends FunSuite {
       )
     )
     assertEquals(
-      LIfReader.fromSExpToStmt(sexp),
+      LCoreReader.fromSExpToStmt(sexp),
       LCore.ExprStmt(onePlusOneAst)
     )
   }
@@ -131,7 +131,7 @@ class ParserTests extends FunSuite {
       )
     )
     assertEquals(
-      LIfReader.fromSExpToStmt(sexp),
+      LCoreReader.fromSExpToStmt(sexp),
       LCore.AssignStmt(Identifier("x"), LCore.Constant(5))
     )
   }
@@ -161,7 +161,7 @@ class ParserTests extends FunSuite {
       )
     )
     assertEquals(
-      LIfReader.fromSExpToStmt(sexp),
+      LCoreReader.fromSExpToStmt(sexp),
       LCore.PrintStmt(
         LCore.BinaryNumericOp(
           BinaryNumericOperator.Add,
@@ -177,21 +177,21 @@ class LIntInterpreterTests extends FunSuite {
 
   test("LIntInterpreter.evalExpr - binary: 1 + 1") {
     assertEquals(
-      LIntInterpreter.evalExpr(LIfReader.fromSExpToExpr(sexpOnePlusOne)),
+      LIntInterpreter.evalExpr(LCoreReader.fromSExpToExpr(sexpOnePlusOne)),
       2L
     )
   }
 
   test("LIntInterpreter.evalExpr - binary: 4 - 2") {
     assertEquals(
-      LIntInterpreter.evalExpr(LIfReader.fromSExpToExpr(sexpFourMinusTwo)),
+      LIntInterpreter.evalExpr(LCoreReader.fromSExpToExpr(sexpFourMinusTwo)),
       2L
     )
   }
 
   test("LIntInterpreter.evalExpr - unary: -8") {
     assertEquals(
-      LIntInterpreter.evalExpr(LIfReader.fromSExpToExpr(sexpMinusEight)),
+      LIntInterpreter.evalExpr(LCoreReader.fromSExpToExpr(sexpMinusEight)),
       -8L
     )
   }
@@ -202,7 +202,7 @@ class LIntInterpreterTests extends FunSuite {
 
     val outputStream = new java.io.ByteArrayOutputStream()
     Console.withOut(outputStream) {
-      LIntInterpreter.evalModule(LIfReader.fromSExpToModule(parse(input)))
+      LIntInterpreter.evalModule(LCoreReader.fromSExpToModule(parse(input)))
     }
 
     val actualOutput = outputStream.toString
@@ -279,7 +279,7 @@ class RemoveComplexOperandsTests extends FunSuite {
   test("simplify to LMonVar - nested arithmetic") {
     val program = "1 + (2+2) -8"
     val result = removeComplexOperands(
-      LIfReader.fromSExpToModule(parse(program))
+      LCoreReader.fromSExpToModule(parse(program))
     )
 
     val expected = LMon.Module(
@@ -322,7 +322,7 @@ class RemoveComplexOperandsTests extends FunSuite {
   test("simplify to LMonIf - IfExpr") {
     val input = "if 1==1 then 1+1 else 2+2"
     val output = removeComplexOperands(
-      LIfReader.fromSExpToModule(parse(input))
+      LCoreReader.fromSExpToModule(parse(input))
     )
 
     val expected = LMon.Module(
@@ -409,7 +409,7 @@ class selectInstructionsTests extends FunSuite {
     val result = selectInstructions(
       explicateControl(
         removeComplexOperands(
-          LIfReader.fromSExpToModule((parse(programm)))
+          LCoreReader.fromSExpToModule((parse(programm)))
         )
       )
     )
@@ -438,7 +438,7 @@ class selectInstructionsTests extends FunSuite {
     val result = selectInstructions(
       explicateControl(
         removeComplexOperands(
-          LIfReader.fromSExpToModule((parse(programm)))
+          LCoreReader.fromSExpToModule((parse(programm)))
         )
       )
     )
@@ -506,7 +506,7 @@ class selectInstructionsTests extends FunSuite {
     val result = selectInstructions(
       explicateControl(
         removeComplexOperands(
-          LIfReader.fromSExpToModule(parse(programm))
+          LCoreReader.fromSExpToModule(parse(programm))
         )
       )
     )
@@ -537,7 +537,7 @@ class ShrinkTests extends FunSuite {
         LCore.Constant(2),
         LCore.ConstantBool(false)
       )
-    assertEquals(shrinkExpr(andExpr), expected)
+    assertEquals(shrink(andExpr), expected)
   }
 
   test("shrinkExpr - or") {
@@ -547,7 +547,7 @@ class ShrinkTests extends FunSuite {
         LCore.ConstantBool(true),
         LCore.Constant(2)
       )
-    assertEquals(shrinkExpr(orExpr), expected)
+    assertEquals(shrink(orExpr), expected)
   }
 
   test("shrinkExpr - nested expression") {
@@ -562,7 +562,7 @@ class ShrinkTests extends FunSuite {
       ),
       LCore.ConstantBool(false)
     )
-    assertEquals(shrinkExpr(input), expected)
+    assertEquals(shrink(input), expected)
   }
 
   test("shrinkStmt - print") {
@@ -573,7 +573,7 @@ class ShrinkTests extends FunSuite {
         LCore.ConstantBool(false)
       )
     )
-    assertEquals(shrinkStmt(nestedAndInPrint), expected)
+    assertEquals(shrink(nestedAndInPrint), expected)
   }
 
   test("shrinkStmt - assign") {
@@ -585,7 +585,7 @@ class ShrinkTests extends FunSuite {
         LCore.ConstantBool(false)
       )
     )
-    assertEquals(shrinkStmt(nestedAndInAssign), expected)
+    assertEquals(shrink(nestedAndInAssign), expected)
   }
 
   test("shrinkModule - assing and print") {
@@ -623,7 +623,7 @@ class EndToEndTests extends FunSuite {
         )
       ) :: Nil
     )
-    assertEquals(LIfReader.fromSExpToModule(parse(printCall)), expected)
+    assertEquals(LCoreReader.fromSExpToModule(parse(printCall)), expected)
   }
 
   test("End-to-End: object language -> AST - IfExpr") {
@@ -642,7 +642,7 @@ class EndToEndTests extends FunSuite {
       ) :: Nil
     )
 
-    assertEquals(LIfReader.fromSExpToModule(parse(input)), expected)
+    assertEquals(LCoreReader.fromSExpToModule(parse(input)), expected)
   }
   test("End-to-End: object language -> AST - IfStmt") {
     val input = "if (1 < 2) {true} else {false}"
@@ -655,7 +655,7 @@ class EndToEndTests extends FunSuite {
       ) :: Nil
     )
 
-    assertEquals(LIfReader.fromSExpToModule(parse(input)), expected)
+    assertEquals(LCoreReader.fromSExpToModule(parse(input)), expected)
   }
   test("End-to-End: object language -> AST - BinaryLogicOp") {
     val input = "true && false"
@@ -669,7 +669,7 @@ class EndToEndTests extends FunSuite {
       ) :: Nil
     )
 
-    assertEquals(LIfReader.fromSExpToModule(parse(input)), expected)
+    assertEquals(LCoreReader.fromSExpToModule(parse(input)), expected)
   }
   test("End-to-End: object language -> AST - UnaryLogicOp") {
     val input = "!(1 < 2)"
@@ -686,13 +686,13 @@ class EndToEndTests extends FunSuite {
       ) :: Nil
     )
 
-    assertEquals(LIfReader.fromSExpToModule(parse(input)), expected)
+    assertEquals(LCoreReader.fromSExpToModule(parse(input)), expected)
   }
 
   test("End-to-End: object language -> eval result") {
     val program = "1 + (4 - 2) - (-8)"
     assertEquals(
-      LIntInterpreter.evalModule(LIfReader.fromSExpToModule(parse(program))),
+      LIntInterpreter.evalModule(LCoreReader.fromSExpToModule(parse(program))),
       11L
     )
   }

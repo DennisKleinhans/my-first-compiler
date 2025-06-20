@@ -38,14 +38,14 @@ object SelectInstructions {
     case CompareOperator.Gt    => x86.Cc.G
     case CompareOperator.GtE   => x86.Cc.Ge
 
-  /** Convert a CIf.CProgram (map from label → BasicBlock) into an
-    * x86VarIf.Program. Each BasicBlock’s statements and tail are lowered to
-    * x86VarIf.Instr, and then collected under the same label in the result.
+  /** Convert a CIr.CProgram (map from label → BasicBlock) into an
+    * x86Var.Program. Each BasicBlock’s statements and tail are lowered to
+    * x86Var.Instr, and then collected under the same label in the result.
     *
     * @param program
-    *   the CIf program to compile
+    *   the CIr program to compile
     * @return
-    *   a x86VarIf.Program containing the Map of lables to blocks
+    *   a x86Var.Program containing the Map of lables to blocks
     */
   def selectInstructions(program: CIr.CProgram): x86Var.Program =
     val selectedBlocks: Map[String, List[x86Var.Instr]] = program.blocks.map {
@@ -56,12 +56,12 @@ object SelectInstructions {
     }
     x86Var.Program(selectedBlocks)
 
-  /** Lower a single CIf.Stmt into a sequence of x86VarIf.Instr. Handles
+  /** Lower a single CIr.Stmt into a sequence of x86Var.Instr. Handles
     * AssignStmt (Atom, UnaryNumericOp, BinaryNumericOp, Compare, ReadIntCall),
     * PrintStmt, and ExprStmt(ReadIntCall). Other cases produce no instructions.
     *
     * @param stmt
-    *   the CIf statement to compile
+    *   the CIr statement to compile
     * @return
     *   a list of x86 instructions implementing the statement
     */
@@ -127,13 +127,13 @@ object SelectInstructions {
           )
         case _ => Nil
 
-  /** Lower a CIf.Tail into a sequence of x86VarIf.Instr. Handles Return (moving
+  /** Lower a CIr.Tail into a sequence of x86Var.Instr. Handles Return (moving
     * the return value to RAX and jumping to "conclusion"), Goto (unconditional
     * jump), and If(Compare, thenGoto, elseGoto) (single cmp + conditional jump
     * + unconditional jump).
     *
     * @param tail
-    *   the CIf tail to compile
+    *   the CIr tail to compile
     * @return
     *   a list of x86 instructions implementing the tail
     */

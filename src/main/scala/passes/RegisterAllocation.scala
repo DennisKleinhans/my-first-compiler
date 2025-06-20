@@ -32,7 +32,6 @@ object RegisterAllocation {
     R14 -> 10
   )
 
-  val callerSavedRegisters = Set(Rax, Rcx, Rdx, Rsi, Rdi, R8, R9, R10, R11)
   val callerSavedRegistersColors: Coloring[x86Var.Location] = Map(
     Rax -> -1,
     Rcx -> 0,
@@ -45,12 +44,14 @@ object RegisterAllocation {
     R11 -> -4
   )
 
-  /** Builds a basic block graph from the given x86VarIf.Program. Each block is
+  val callerSavedRegisters = Set(Rax, Rcx, Rdx, Rsi, Rdi, R8, R9, R10, R11)
+
+  /** Builds a basic block graph from the given x86Var.Program. Each block is
     * represented by its label, and edges are created based on the control flow
     * between blocks.
     *
     * @param program
-    *   The x86VarIf.Program to analyze
+    *   The x86Var.Program to analyze
     * @return
     *   A Graph where vertices are block labels and edges represent control flow
     *   between blocks (i.e., jumps and fall-throughs).
@@ -118,7 +119,7 @@ object RegisterAllocation {
   /** Reads the locations accessed by the given instruction.
     *
     * @param instr
-    *   The instruction to analyze, which can be any x86VarIf.Instr.
+    *   The instruction to analyze, which can be any x86Var.Instr.
     * @return
     *   A set of locations that the instruction reads.
     */
@@ -144,7 +145,7 @@ object RegisterAllocation {
   /** Returns the set of locations that are written by the given instruction.
     *
     * @param instr
-    *   The instruction to analyze, which can be any x86VarIf.Instr.
+    *   The instruction to analyze, which can be any x86Var.Instr.
     * @return
     *   A set of locations that the instruction writes to.
     */
@@ -166,10 +167,10 @@ object RegisterAllocation {
     case _                         => Set.empty
 
   /** Performs a backward data-flow analysis to uncover live variables in the
-    * given x86VarIf.Program.
+    * given x86Var.Program.
     *
     * @param program
-    *   The x86VarIf.Program to analyze, which contains a set of blocks with
+    *   The x86Var.Program to analyze, which contains a set of blocks with
     *   instructions.
     * @return
     *   An analyzed.Program where each instruction is annotated with a set of
@@ -196,15 +197,15 @@ object RegisterAllocation {
     case _                  => false
   }
 
-  /** Generates an interference graph for the given x86VarIf.Program. This graph
+  /** Generates an interference graph for the given x86Var.Program. This graph
     * represents the interference between variables based on their live ranges
     * and definitions.
     *
     * @param prog
-    *   The x86VarIf.Program to analyze, which contains a set of blocks with
+    *   The x86Var.Program to analyze, which contains a set of blocks with
     *   instructions and their live ranges.
     * @return
-    *   A Graph where vertices are x86VarIf.Location and edges represent
+    *   A Graph where vertices are x86Var.Location and edges represent
     *   interference between them (i.e., if two locations are live at the same
     *   time, they are connected by an edge).
     */
@@ -245,7 +246,7 @@ object RegisterAllocation {
     *   List of tuples where each tuple contains an instruction and a set of
     *   live locations after that instruction.
     * @return
-    *   A Graph where vertices are x86VarIf.Location and edges represent
+    *   A Graph where vertices are x86Var.Location and edges represent
     *   interference between them (i.e., if two locations are live at the same
     *   time, they are connected by an edge).
     */
@@ -281,10 +282,10 @@ object RegisterAllocation {
   /** Assigns homes to variables based on their coloring.
     *
     * @param coloring
-    *   A mapping from x86VarIf.Location to Color, where each location is
+    *   A mapping from x86Var.Location to Color, where each location is
     *   assigned a color representing its register or spill location.
     * @return
-    *   A mapping from x86VarIf.Variable to x86VarIf.Location, where each
+    *   A mapping from x86Var.Variable to x86Var.Location, where each
     *   variable is assigned a home location (either a physical register or a
     *   spill location).
     */
@@ -312,16 +313,16 @@ object RegisterAllocation {
       ._2
   }
 
-  /** Assigns homes to variables in the given x86VarIf.Program based on the
+  /** Assigns homes to variables in the given x86Var.Program based on the
     * provided mapping of variables to locations. It rewrites the instructions
     * to use the assigned homes, replacing variables with their corresponding
     * locations (either registers or spill locations).
     *
     * @param program
-    *   The x86VarIf.Program to rewrite, which contains a set of blocks with
+    *   The x86Var.Program to rewrite, which contains a set of blocks with
     *   instructions.
     * @param homes
-    *   A mapping from x86VarIf.Variable to x86VarIf.Location, where each
+    *   A mapping from x86Var.Variable to x86Var.Location, where each
     *   variable is assigned a home location (either a physical register or a
     *   spill location).
     * @return
@@ -409,7 +410,7 @@ object RegisterAllocation {
 
   }
 
-  /** Allocates registers for the given x86VarIf.Program using a graph-based
+  /** Allocates registers for the given x86Var.Program using a graph-based
     * register allocation algorithm. It first uncovers live variables, builds an
     * interference graph, colors the graph using the DSATUR algorithm, and then
     * assigns homes to variables based on the coloring. The result is a tuple
@@ -417,7 +418,7 @@ object RegisterAllocation {
     * spill offset used in the program.
     *
     * @param program
-    *   The x86VarIf.Program to allocate registers for, which contains a set of
+    *   The x86Var.Program to allocate registers for, which contains a set of
     *   blocks with instructions.
     * @return
     *   A tuple containing the rewritten x86.Program with assigned homes and the

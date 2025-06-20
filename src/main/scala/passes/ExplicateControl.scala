@@ -73,7 +73,7 @@ object ExplicateControl {
     }
   }
 
-  /** Translate a LMonIf expression into one or more CIf BasicBlocks that assign
+  /** Translate a LMon expression into one or more CIr BasicBlocks that assign
     * its value into a given temporary variable, then jump to the provided
     * continuation block.
     *
@@ -104,20 +104,20 @@ object ExplicateControl {
     * the tail intact.
     *
     * @param expr
-    *   The LMonIf expression to evaluate and store into `id`.
+    *   The LMon expression to evaluate and store into `id`.
     * @param id
     *   The Identifier of the temporary variable where the result will be
     *   stored.
     * @param continuation
-    *   A CIf.BasicBlock representing “what comes next” after this expression’s
+    *   A CIr.BasicBlock representing “what comes next” after this expression’s
     *   value is assigned. Its `.stmts` are appended after this assignment, and
     *   its `.tail` is used for the Goto in the new block.
     * @param basicBlocks
-    *   A mutable map from label → CIf.BasicBlock, which is populated whenever a
+    *   A mutable map from label -> CIr.BasicBlock, which is populated whenever a
     *   new block is created. Any BasicBlock returned by this function must
     *   already be inserted into `basicBlocks` under a fresh label.
     * @return
-    *   The newly created CIf.BasicBlock (with its assignment prepended onto
+    *   The newly created CIr.BasicBlock (with its assignment prepended onto
     *   `continuation.stmts`).
     */
   def explicateAssign(
@@ -168,7 +168,7 @@ object ExplicateControl {
     }
   }
 
-  /** Translate a LMonIf expression used as a boolean predicate into a CIf
+  /** Translate a LMon expression used as a boolean predicate into a CIr
     * BasicBlock that jumps to `thn` if the predicate is `true`, or to `els` if
     * `false`.
     *
@@ -206,10 +206,10 @@ object ExplicateControl {
     * @param condition
     *   The LMonIf expression to treat as a boolean test.
     * @param thn
-    *   A CIf.BasicBlock that must be jumped to if `condition` evaluates to
+    *   A CIr.BasicBlock that must be jumped to if `condition` evaluates to
     *   true.
     * @param els
-    *   A CIf.BasicBlock that must be jumped to if `condition` evaluates to
+    *   A CIr.BasicBlock that must be jumped to if `condition` evaluates to
     *   false.
     * @param basicBlocks
     *   A mutable map of all BasicBlocks so far; any newly generated BasicBlock
@@ -231,10 +231,10 @@ object ExplicateControl {
         // Helper to pick a label for the BasicBlock, either by reusing an existing Goto or creating a new one
         def pickLabel(block: CIr.BasicBlock): String = block match {
           case CIr.BasicBlock(Nil, CIr.Goto(lbl)) =>
-            // schon ein reiner Goto-Block ⇒ wir können direkt dieses Label verwenden
+            // Reusing an existing Goto label
             lbl
           case _ =>
-            // komplexerer Block ⇒ wir brauchen einen echten Label-Eintrag
+            // Create a fresh label for this block, store it in basicBlocks, and return it
             val fresh = LabelGenerator.freshBlockLabel()
             basicBlocks(fresh) = block
             fresh
@@ -243,9 +243,6 @@ object ExplicateControl {
         // Generate fresh labels for the “then” and “else” targets, insert them in the map
         val thenLable = pickLabel(thn)
         val elseLable = pickLabel(els)
-
-        // basicBlocks(thenLable) = thn
-        // basicBlocks(elseLable) = els
 
         // Build an If‐tail: If(e1 cmp e2) goto thenLabel else goto elseLabel
         val compareExpr: CIr.Compare = CIr.Compare(cmp, e1, e2)
@@ -287,7 +284,7 @@ object ExplicateControl {
     }
   }
 
-  /** Translate a LMonIf expression purely for its side‐effects, then jump to a
+  /** Translate a LMon expression purely for its side‐effects, then jump to a
     * continuation block.
     *
     *   - If `expr` is an `IfExpr(cond, thenExpr, elseExpr)`, we recursively
@@ -346,7 +343,7 @@ object ExplicateControl {
     }
   }
 
-  /** Translate a single LMonIf statement into one or more CIf BasicBlocks that,
+  /** Translate a single LMonIf statement into one or more CIr BasicBlocks that,
     * upon completion, jump to the provided continuation block.
     *
     * Cases:
@@ -368,7 +365,7 @@ object ExplicateControl {
     *
     * Each newly created BasicBlock is stored in `basicBlocks` under a fresh
     * label before being returned, ensuring that all generated blocks appear in
-    * the final CIf.CProgram.
+    * the final CIr.CProgram.
     *
     * @param stmt
     *   The LMonIf.Stmt to translate.
@@ -376,10 +373,10 @@ object ExplicateControl {
     *   A BasicBlock representing “what to do next” once `stmt` has finished.
     *   Its `.tail` is used in newly created blocks to chain control flow.
     * @param basicBlocks
-    *   A mutable map from label → BasicBlock. Every new block must be added
+    *   A mutable map from label -> BasicBlock. Every new block must be added
     *   here under a unique label via `LabelGenerator.freshLabel()`.
     * @return
-    *   The CIf.BasicBlock that corresponds to the “entry” of this translated
+    *   The CIr.BasicBlock that corresponds to the “entry” of this translated
     *   statement. Execution should begin at this returned block in order to
     *   honor `stmt` followed by `continuation`.
     */
@@ -452,16 +449,16 @@ object ExplicateControl {
     }
   }
 
-  /** Helper to convert a LMonIf expression node into the corresponding CIf.Expr
+  /** Helper to convert a LMonIf expression node into the corresponding CIr.Expr
     * node.
     *
     * This function handles only those expression forms that directly map to
     * CIf:
-    *   - `UnaryNumericOp` → `CIf.UnaryNumericOp`
-    *   - `BinaryNumericOp` → `CIf.BinaryNumericOp`
-    *   - `Compare` → `CIf.Compare`
-    *   - `ReadIntCall` → `CIf.ReadIntCall`
-    *   - `AtomExpr(a)` → `CIf.AtomExpr(a)`
+    *   - `UnaryNumericOp` -> `CIf.UnaryNumericOp`
+    *   - `BinaryNumericOp` -> `CIf.BinaryNumericOp`
+    *   - `Compare` -> `CIf.Compare`
+    *   - `ReadIntCall` -> `CIf.ReadIntCall`
+    *   - `AtomExpr(a)` -> `CIf.AtomExpr(a)`
     *
     * Any other form (e.g. nested `IfExpr`, `Begin`, or `UnaryLogicOp`) cannot
     * be directly converted and triggers an error. Such forms must be handled by
@@ -470,7 +467,7 @@ object ExplicateControl {
     * before calling this helper.
     *
     * @param expr
-    *   The LMonIf.Expr to convert.
+    *   The LMon.Expr to convert.
     * @return
     *   The equivalent CIf.Expr node.
     * @throws RuntimeException
@@ -486,21 +483,21 @@ object ExplicateControl {
     case _ => sys error "cannot directly convert expression: " + expr
 
   /** The top‐level pass that translates an entire LMonIf.Module into a
-    * CIf.CProgram.
+    * CIr.CProgram.
     *
     *   1. Create an initially empty mutable map `basicBlocks` to collect all
     *      generated BasicBlocks. Fold‐right over the module’s statements, using
-    *      `foldRight(CIf.BasicBlock(Nil, Return(0))) { (stmt, cont) =>
+    *      `foldRight(CIr.BasicBlock(Nil, Return(0))) { (stmt, cont) =>
     *      explicateStmt(stmt, cont, basicBlocks) }` so that each top‐level
     *      statement is translated (via `explicateStmt`) into a chain of
     *      BasicBlocks, ultimately ending in a block whose tail is `Return(0)`.
     *      The result of the fold (`entryBlock`) is the first block to execute
     *      for the program. Assign the final `entryBlock` under the label
     *      `"start"` in `basicBlocks`, marking the program entry. Return
-    *      `CIf.CProgram(basicBlocks.toMap)`, which contains every label →
+    *      `CIr.CProgram(basicBlocks.toMap)`, which contains every label ->
     *      BasicBlock mapping.
     *
-    * In the resulting CIf.CProgram:
+    * In the resulting CIr.CProgram:
     *   - The entry point is `"start"`.
     *   - Every BasicBlock in the map has a list of simple CIf.Statements
     *     (`stmts`) and a tail (`Goto`, `If`, or `Return`).
@@ -508,9 +505,9 @@ object ExplicateControl {
     *     jumps (`If`).
     *
     * @param module
-    *   The parsed LMonIf.Module to translate.
+    *   The parsed LMon.Module to translate.
     * @return
-    *   The equivalent CIf.CProgram, representing the same program with explicit
+    *   The equivalent CIr.CProgram, representing the same program with explicit
     *   control flow.
     */
   def explicateControl(module: LMon.Module): CIr.CProgram = {

@@ -9,7 +9,7 @@ import CommonNodes.*
   * Provides methods to translate serialized S-Expressions into structured LVar
   * language features.
   */
-object LIfReader {
+object LCoreReader {
 
   /** Converts an S-Expression into a corresponding `CompareOperator`.
     *
