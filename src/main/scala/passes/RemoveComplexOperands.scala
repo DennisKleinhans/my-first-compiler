@@ -190,7 +190,7 @@ object RemoveComplexOperands {
 
       case LCore.WhileStmt(test, body) =>
         // 1) Test vereinfachen, aber Zuweisungen *nicht* vorziehen
-        val (_, simpleCondExpr) = simplifyExpr(test, gen)
+        val (condAssignments, simpleCondExpr) = simplifyExpr(test, gen)
 
         // 2) Körper wie gehabt rekursiv simplifizieren
         val simplifiedBodyStmts = body.flatMap(simplifyStmt(_, gen))
@@ -198,7 +198,7 @@ object RemoveComplexOperands {
         // 3) Nur noch eine WhileStmt zurückgeben – ohne condAssignments
         List(
           LMon.WhileStmt(
-            simpleCondExpr,
+            LMon.Begin(condAssignments, simpleCondExpr),
             simplifiedBodyStmts
           )
         )
