@@ -3,12 +3,13 @@ package lang
 case class LexerError(message: String) extends RuntimeException(message)
 
 enum Token {
-  case COMMA, COLON                 // , :
+  case COMMA, COLON, DOT            // , :, .
   case LPAREN, RPAREN               // ( )
   case LCURLY, RCURLY               // { }
   case LBRACKET, RBRACKET           // [ ]
-  case PLUS, MINUS, EQUAL           // Operators: + - =
-  case EQ, NEQ, LT, LE, GT, GE      // Operators == != <= > >=
+  case UNDERSCORE
+  case PLUS, MINUS, EQUAL, MULT    // Operators: + - = *
+  case EQ, NEQ, LT, LE, GT, GE, IS  // Operators == != <= > >= Is
   case AND, OR, NOT                 // && || !
   case TRUE, FALSE                  // true false
   case NUMBER(value: Long)          // 123
@@ -20,7 +21,7 @@ enum Token {
 
 class Lexer(input: String) extends Iterator[Token] {
 
-  private var pos = 0
+  private var pos         = 0
   private var currentChar = if input.isEmpty then '\u0000' else input(0)
 
   private def skip(): Unit =
@@ -83,15 +84,24 @@ class Lexer(input: String) extends Iterator[Token] {
       case ':' =>
         skip()
         Token.COLON
+      case '.' =>
+        skip()
+        Token.DOT
       case ',' =>
         skip()
         Token.COMMA
+      case '_' =>
+        skip()
+        Token.UNDERSCORE
       case '+' =>
         skip()
         Token.PLUS
       case '-' =>
         skip()
         Token.MINUS
+      case '*' =>
+        skip()
+        Token.MULT
       case '!' =>
         skip()
         currentChar match {
@@ -138,6 +148,7 @@ class Lexer(input: String) extends Iterator[Token] {
           case Token.IDENT("else")  => Token.ELSE
           case Token.IDENT("true")  => Token.TRUE
           case Token.IDENT("false") => Token.FALSE
+          case Token.IDENT("is")    => Token.IS
           case other => other
         }
       case _ => throw LexerError(s"Unexpected character '${currentChar}' at position $pos")

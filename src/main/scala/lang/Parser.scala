@@ -14,11 +14,13 @@ object tags {
   val If     = Symbol("If")
   val Expr   = Symbol("Expr")
   val Assign = Symbol("Assign")
+  val ArrayAssign = Symbol("ArrayAssign")
   val While = Symbol("While")
 
   // BinaryOp :=
   val Add = Symbol("Add")
   val Sub = Symbol("Sub")
+  val Mult = Symbol("Mult")
   val And = Symbol("And")
   val Or = Symbol("Or")
   val Eq = Symbol("Eq")
@@ -27,6 +29,7 @@ object tags {
   val Le = Symbol("Le")
   val Gt = Symbol("Gt")
   val Ge = Symbol("Ge")
+  val Is = Symbol("Is")
 
   // UnaryOp :=
   val Neg = Symbol("Neg")
@@ -43,6 +46,9 @@ object tags {
   val False     = Symbol("False")
   val Tuple     = Symbol("Tuple")
   val Subscript = Symbol("Subscript")
+  // for LArray
+  val Array     = Symbol("Array")
+  val ArraySubscript = Symbol("ArraySubscript")
 
 }
 
@@ -120,6 +126,11 @@ class Parser(tokens: Iterator[Token]) {
           consume(EQUAL)
           val rhs = exp()
           Node(Assign, sym, rhs)
+        case Node(ArraySubscript :: e :: index :: Nil ) if peek == EQUAL =>
+          consume(EQUAL)
+          val rhs = exp()
+          Node(ArrayAssign, e, index, rhs)
+
         case exp => Node(Expr, exp)
       }
     }
@@ -129,10 +140,12 @@ class Parser(tokens: Iterator[Token]) {
 
   private def orExpr(): SExp  = infix(andExpr, OR)
   private def andExpr(): SExp = infix(eqExpr, AND)
-  private def eqExpr(): SExp  = infix(relExpr, EQ, NEQ)
+  private def eqExpr(): SExp  = infix(relExpr, EQ, NEQ, IS)
   private def relExpr(): SExp = infix(addExpr, LT, LE, GT, GE)
 
-  private def addExpr(): SExp = infix(subscript, PLUS, MINUS)
+  private def addExpr(): SExp = infix(multExpr, PLUS, MINUS)
+  private def multExpr(): SExp = infix(accessExpr, MULT)
+
 
   private inline def infix(nonTerminal: () => SExp, ops: Token*): SExp =
     var left = nonTerminal()
@@ -146,6 +159,7 @@ class Parser(tokens: Iterator[Token]) {
   private def binop(): SExp = next() match {
     case PLUS  => Add
     case MINUS => Sub
+    case MULT  => Mult
     case AND   => And
     case OR    => Or
     case EQ    => Eq
@@ -154,16 +168,24 @@ class Parser(tokens: Iterator[Token]) {
     case LE    => Le
     case GT    => Gt
     case GE    => Ge
+    case IS    => Is
     case t     => throw ParserError(s"Unexpected token: $t")
   }
 
-  private def subscript(): SExp =
+  private def accessExpr() : SExp =
     var left = unary()
-    while (peek == LBRACKET) {
-      consume(LBRACKET)
-      val index = exp()
-      consume(RBRACKET)
-      left = Node(Subscript, left, index)
+    while ((peek == DOT) || (peek == LBRACKET)) {
+      if (peek == LBRACKET) {
+        consume(LBRACKET)
+        val index = exp()
+        consume(RBRACKET)
+        left = Node(ArraySubscript, left, index)
+      } else {
+        consume(DOT)
+        consume(UNDERSCORE)
+        val index = number()
+        left = Node(Subscript, left, Number(index))
+      }
     }
     left
 
@@ -192,6 +214,13 @@ class Parser(tokens: Iterator[Token]) {
   private def arguments(): SExp =
     Node(many(exp, LPAREN, COMMA, RPAREN))
 
+  private def number() : Long =
+    peek match {
+      case NUMBER(value) =>
+        skip()
+        value
+      case t => throw ParserError(s"Number expected, got token: $t")
+    }
   private def primitive(): SExp =
     peek match {
       case IF =>
@@ -200,9 +229,12 @@ class Parser(tokens: Iterator[Token]) {
         val thn  = { consume(THEN); exp() }
         val els  = { consume(ELSE); exp() }
         Node(IfExp, cond, thn, els)
+      case LCURLY =>
+        val elements = many(exp, LCURLY, COMMA, RCURLY)
+        Node(Tuple, Node(elements))
       case LBRACKET =>
         val elements = many(exp, LBRACKET, COMMA, RBRACKET)
-        Node(Tuple, Node(elements))
+        Node(Array, Node(elements))
       case LPAREN =>
         parens { exp() }
       case NUMBER(value) =>

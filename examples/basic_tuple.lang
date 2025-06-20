@@ -1,0 +1,4 @@
+t = {1, 2, 3}
+print(t._0)
+print(t._1)
+print(t._2)
