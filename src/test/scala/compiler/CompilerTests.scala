@@ -537,7 +537,7 @@ class ShrinkTests extends FunSuite {
         LCore.Constant(2),
         LCore.ConstantBool(false)
       )
-    assertEquals(shrink(andExpr), expected)
+    assertEquals(shrinkExpr(andExpr), expected)
   }
 
   test("shrinkExpr - or") {
@@ -547,7 +547,7 @@ class ShrinkTests extends FunSuite {
         LCore.ConstantBool(true),
         LCore.Constant(2)
       )
-    assertEquals(shrink(orExpr), expected)
+    assertEquals(shrinkExpr(orExpr), expected)
   }
 
   test("shrinkExpr - nested expression") {
@@ -562,7 +562,7 @@ class ShrinkTests extends FunSuite {
       ),
       LCore.ConstantBool(false)
     )
-    assertEquals(shrink(input), expected)
+    assertEquals(shrinkExpr(input), expected)
   }
 
   test("shrinkStmt - print") {

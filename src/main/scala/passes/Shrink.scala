@@ -7,31 +7,31 @@ import LCore.Expr
 
 object Shrink {
 
-  /** Shrinks the LIf module by simplifying its statements and expressions.
+  /** Shrinks the LCore module by simplifying its statements and expressions.
     *
     * @param module
     * @return
     */
   def shrink(module: LCore.Module): LCore.Module =
-    LCore.Module(module.stmts.map(shrinkStmt))
+    LCore.Module(module.stmts.map(shrink))
 
   /** Shrinks a single statement by simplifying its expressions.
     *
     * @param stmt
     * @return
     */
-  def shrinkStmt(stmt: LCore.Stmt): LCore.Stmt = stmt match
+  def shrink(stmt: LCore.Stmt): LCore.Stmt = stmt match
     case LCore.ExprStmt(e)       => LCore.ExprStmt(shrinkExpr(e))
     case LCore.PrintStmt(e)      => LCore.PrintStmt(shrinkExpr(e))
     case LCore.AssignStmt(id, e) => LCore.AssignStmt(id, shrinkExpr(e))
     case LCore.IfStmt(cond, thenBranch, elseBranch) =>
       LCore.IfStmt(
         shrinkExpr(cond),
-        thenBranch.map(shrinkStmt),
-        elseBranch.map(shrinkStmt)
+        thenBranch.map(shrink),
+        elseBranch.map(shrink)
       )
     case LCore.WhileStmt(cond, body) =>
-      LCore.WhileStmt(shrinkExpr(cond), body.map(shrinkStmt))
+      LCore.WhileStmt(shrinkExpr(cond), body.map(shrink))
 
   /** Shrinks an expression by simplifying its structure and removing
     * unnecessary complexity by replacing the `and` and `or` operators with if
