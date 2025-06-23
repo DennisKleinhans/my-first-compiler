@@ -48,6 +48,7 @@ object CommonNodes {
     case LtE
     case Gt
     case GtE
+    case Is
 
   case class Identifier(name: String)
 }
@@ -94,6 +95,9 @@ object LCore {
     case ReadIntCall
     case Variable(id: Identifier)
     case IfExpr(condExpr: Expr, thenExpr: Expr, elseExpr: Expr)
+    case Tuple(elements: List[Expr])
+    case TupleProjection(tuple: Expr, index: Long)
+    case TupleLen(tuple: Expr)
 }
 
 /** The abstract syntax tree (AST) for the LMonWhile language.
@@ -140,6 +144,9 @@ object LMon {
     case AtomExpr(a: Atom)
     case IfExpr(condExpr: Expr, thenExpr: Expr, elseExpr: Expr)
     case Begin(stmts: List[Stmt], e: Expr)
+    case TupleProjection(tuple: Atom, index: Int)
+    case Allocate(size: Int)
+    case TupleLen
 }
 
 /** The abstract syntax tree (AST) for the CIf language.
@@ -173,6 +180,9 @@ object CIr {
     case BinaryNumericOp(op: BinaryNumericOperator, lhs: Atom, rhs: Atom)
     case Compare(cmp: CompareOperator, lhs: Atom, rhs: Atom)
     case ReadIntCall
+    case Allocate(size: Int)
+    case TupleProjection(tuple: Atom, index: Int)
+    case TupleLen
 
   /** A statement in CIf represents either a standalone expression, a print
     * operation or an assign operation.

@@ -27,6 +27,7 @@ object LCoreReader {
     case Symbol("Le")  => CompareOperator.LtE
     case Symbol("Gt")  => CompareOperator.Gt
     case Symbol("Ge")  => CompareOperator.GtE
+    case Symbol("Is")  => CompareOperator.Is
     case _             => sys error "Not a supported compare operator"
 
   /** Converts an S-Expression into a corresponding `Expr`.
@@ -56,13 +57,6 @@ object LCoreReader {
           Nil
         ) =>
       LCore.ReadIntCall
-
-    case Node(
-          Symbol("Call") :: Node(
-            Symbol("Variable") :: Symbol(name) :: Nil
-          ) :: _ :: Nil
-        ) if (name != "print") =>
-      sys.error(s"Unknown function call: $name")
 
     case Node(Symbol("Unary") :: Symbol("Neg") :: e :: Nil) =>
       LCore.UnaryNumericOp(UnaryNumericOperator.USub, fromSExpToExpr(e))
@@ -113,6 +107,22 @@ object LCoreReader {
         fromSExpToExpr(e1),
         fromSExpToExpr(e2)
       )
+
+    // Tuple
+    case Node(Symbol("Tuple") :: Node(elements) :: Nil) =>
+      LCore.Tuple(elements.map(fromSExpToExpr))
+
+    // Tuple Projection
+    case Node(Symbol("Subscript") :: tupleVar :: Number(index) :: Nil) =>
+      LCore.TupleProjection(fromSExpToExpr(tupleVar), index)
+
+    // Tuple len()
+    case Node(
+          Symbol("Call") :: Node(
+            Symbol("Variable") :: Symbol("len") :: Nil
+          ) :: Node(tupleVar :: Nil) :: Nil
+        ) =>
+      LCore.TupleLen(fromSExpToExpr(tupleVar))
 
     case other =>
       sys.error(s"invalid expression: $other")
