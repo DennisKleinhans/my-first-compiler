@@ -145,7 +145,7 @@ object LMon {
     case AtomExpr(a: Atom)
     case IfExpr(condExpr: Expr, thenExpr: Expr, elseExpr: Expr)
     case Begin(stmts: List[Stmt], e: Expr)
-    case Allocate(size: Int)
+    case Allocate(size: Long)
     case Load(ptr: Atom, offset: Long)
 }
 
@@ -180,7 +180,7 @@ object CIr {
     case BinaryNumericOp(op: BinaryNumericOperator, lhs: Atom, rhs: Atom)
     case Compare(cmp: CompareOperator, lhs: Atom, rhs: Atom)
     case ReadIntCall
-    case Allocate(size: Int)
+    case Allocate(size: Long)
     case Load(ptr: Atom, offset: Long)
 
   /** A statement in CIf represents either a standalone expression, a print
@@ -216,7 +216,7 @@ object CIr {
 
 }
 
-/** The x86VarIf intermediate representation (IR) for the LMonIf language.
+/** The x86Var intermediate representation (IR) for the LMon language.
   *
   * Represents the structure of LMonIf programs after instruction selection and
   * before final assembly generation.
@@ -240,12 +240,14 @@ object x86Var {
    */
   case class Immediate(n: Long)
 
+  case class Deref(loc: Location, offset: Long)
+
   /** A location in x86VarIf can be a register or a variable.
     *
     * Registers are used for fast access to data, while variables represent
     * memory locations that may require stack allocation.
     */
-  type Location = x86.Reg | x86.ByteReg | x86.Deref | x86.Global | Variable
+  type Location = x86.Reg | x86.ByteReg | x86.Deref | x86.Global | Variable | x86Var.Deref
 
   /** An argument in x86VarIf can be a location (register or variable) or an
     * immediate value (constant).

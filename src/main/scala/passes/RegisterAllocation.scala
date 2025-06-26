@@ -282,12 +282,12 @@ object RegisterAllocation {
   /** Assigns homes to variables based on their coloring.
     *
     * @param coloring
-    *   A mapping from x86Var.Location to Color, where each location is
-    *   assigned a color representing its register or spill location.
+    *   A mapping from x86Var.Location to Color, where each location is assigned
+    *   a color representing its register or spill location.
     * @return
-    *   A mapping from x86Var.Variable to x86Var.Location, where each
-    *   variable is assigned a home location (either a physical register or a
-    *   spill location).
+    *   A mapping from x86Var.Variable to x86Var.Location, where each variable
+    *   is assigned a home location (either a physical register or a spill
+    *   location).
     */
   def homesFor(
       coloring: Map[x86Var.Location, Color]
@@ -322,9 +322,9 @@ object RegisterAllocation {
     *   The x86Var.Program to rewrite, which contains a set of blocks with
     *   instructions.
     * @param homes
-    *   A mapping from x86Var.Variable to x86Var.Location, where each
-    *   variable is assigned a home location (either a physical register or a
-    *   spill location).
+    *   A mapping from x86Var.Variable to x86Var.Location, where each variable
+    *   is assigned a home location (either a physical register or a spill
+    *   location).
     * @return
     *   A tuple containing the rewritten x86.Program and the maximum spill
     *   offset used in the program.
@@ -359,6 +359,11 @@ object RegisterAllocation {
 
           case None =>
             sys.error(s"Variable $variable has no home assigned")
+
+      case x86Var.Deref(loc, offset) =>
+        rewriteLocation(loc) match
+          case r: x86.Reg => x86.Deref(r, offset)
+          case other      => sys error f"expected a Register, but got $other"
 
     }
 
