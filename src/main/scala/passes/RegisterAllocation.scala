@@ -374,7 +374,11 @@ object RegisterAllocation {
         rewriteArg(variable).asInstanceOf[x86.Location]
       case reg: x86.Reg         => reg
       case byteReg: x86.ByteReg => byteReg
-      case other                => sys.error(s"Unexpected location: $other")
+      case x86Var.Deref(loc, offset) =>
+        rewriteLocation(loc) match
+          case r: x86.Reg => x86.Deref(r, offset)
+          case other      => sys error f"expected a Register, but got $other"
+      case other => sys.error(s"Unexpected location: $other")
     }
 
     // Rewrite each instruction in the program to use the assigned homes

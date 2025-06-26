@@ -50,6 +50,8 @@ def compile(input: Path): Path = {
   assemble(target, basename)
 }
 
+
+
 def transformTox86(prog: SExp): Program = {
   val parsed = LCoreReader.fromSExpToModule(prog)
   val shrinked = shrink(parsed)
