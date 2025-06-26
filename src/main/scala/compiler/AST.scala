@@ -127,6 +127,7 @@ object LMon {
     case ExprStmt(e: Expr)
     case IfStmt(cond: Expr, thenBranch: List[Stmt], elseBranch: List[Stmt])
     case WhileStmt(cond: Expr, body: List[Stmt])
+    case StoreStmt(ptr: Atom, offset: Int, value: Atom)
 
   /** An expression in LMonWhile can be a constant value (Long or Boolean), a
     * unary operation, a binary operation, a function call with the restriction
@@ -144,9 +145,8 @@ object LMon {
     case AtomExpr(a: Atom)
     case IfExpr(condExpr: Expr, thenExpr: Expr, elseExpr: Expr)
     case Begin(stmts: List[Stmt], e: Expr)
-    case TupleProjection(tuple: Atom, index: Int)
     case Allocate(size: Int)
-    case TupleLen
+    case Load(ptr: Atom, offset: Long)
 }
 
 /** The abstract syntax tree (AST) for the CIf language.
@@ -181,8 +181,7 @@ object CIr {
     case Compare(cmp: CompareOperator, lhs: Atom, rhs: Atom)
     case ReadIntCall
     case Allocate(size: Int)
-    case TupleProjection(tuple: Atom, index: Int)
-    case TupleLen
+    case Load(ptr: Atom, offset: Long)
 
   /** A statement in CIf represents either a standalone expression, a print
     * operation or an assign operation.
@@ -191,6 +190,7 @@ object CIr {
     case PrintStmt(a: Atom)
     case ExprStmt(e: Expr)
     case AssignStmt(id: Identifier, e: Expr)
+    case StoreStmt(ptr: Atom, offset: Int, value: Atom)
 
   /** A tail in CIf represents either a return, jump via goto or a conditional
     * jump via goto.
