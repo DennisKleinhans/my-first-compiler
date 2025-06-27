@@ -27,12 +27,13 @@ object PreludeAndConclusion {
     val alignedSpace =
       if stackSpace == 0 then 16 else ((stackSpace + 15) / 16) * 16
 
-    val mainBlock = List(PushQ(Reg.Rbp)) ++
-      List(
-        MovQ(Reg.Rsp, Reg.Rbp),
-        SubQ(Immediate(alignedSpace), Reg.Rsp),
-        Jmp("start")
-      )
+    val mainBlock = List(
+      CallQ("initialize", 0),
+      PushQ(Reg.Rbp),
+      MovQ(Reg.Rsp, Reg.Rbp),
+      SubQ(Immediate(alignedSpace), Reg.Rsp),
+      Jmp("start")
+    )
 
     val conclusionBlock = List(
       AddQ(Immediate(alignedSpace), Reg.Rsp),

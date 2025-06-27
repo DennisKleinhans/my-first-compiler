@@ -179,7 +179,7 @@ object RemoveComplexOperands {
       // just use the index directly here, because the projections start with tuple._1
       val loadAssign = LMon.AssignStmt(
         ptrId,
-        LMon.Load(extractAtom(tupleAtom), 8 * index)
+        LMon.Load(extractAtom(tupleAtom), 8 * (index + 1))
       )
 
       (assignments :+ loadAssign, AtomExpr(ptrVar))

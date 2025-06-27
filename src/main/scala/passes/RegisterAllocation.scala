@@ -133,15 +133,17 @@ object RegisterAllocation {
       Set(
         Rdi // only Rdi is used for as argument register for print
       ) ++ calleeSavedRegisters.asInstanceOf[Set[x86Var.Location]]
-    case Instr.PushQ(arg)          => readArg(arg)
-    case Instr.PopQ(arg)           => Set.empty
-    case Instr.RetQ                => Set(Rax) // Ret reads Rax
-    case Instr.CmpQ(lower, higher) => readArg(lower) ++ readArg(higher)
-    case Instr.MovZBQ(src, dest)   => readArg(src)
-    case Instr.Jmp(label)          => Set.empty
-    case Instr.JmpIf(cc, label)    => Set.empty
-    case Instr.Set(cc, dest)       => Set.empty
-    case _                         => Set.empty
+    case Instr.PushQ(arg)                => readArg(arg)
+    case Instr.PopQ(arg)                 => Set.empty
+    case Instr.RetQ                      => Set(Rax) // Ret reads Rax
+    case Instr.CmpQ(lower, higher)       => readArg(lower) ++ readArg(higher)
+    case Instr.MovZBQ(src, dest)         => readArg(src)
+    case Instr.Jmp(label)                => Set.empty
+    case Instr.JmpIf(cc, label)          => Set.empty
+    case Instr.Set(cc, dest)             => Set.empty
+    case Instr.LoadQ(dest, base, offset) => Set(base)
+    case Instr.StoreQ(base, offset, arg) => Set(base) ++ readArg(arg)
+    case _                               => Set.empty
 
   /** Returns the set of locations that are written by the given instruction.
     *
@@ -157,15 +159,17 @@ object RegisterAllocation {
     case Instr.NegQ(arg)       => Set(arg)
     case Instr.CallQ(lable, arity) =>
       callerSavedRegisters.asInstanceOf[Set[x86Var.Location]]
-    case Instr.PushQ(arg)          => Set(Rsp)
-    case Instr.PopQ(arg)           => readArg(arg) ++ Set(Rsp)
-    case Instr.RetQ                => Set.empty
-    case Instr.CmpQ(lower, higher) => Set.empty
-    case Instr.MovZBQ(src, dest)   => Set(dest)
-    case Instr.Jmp(label)          => Set.empty
-    case Instr.JmpIf(cc, label)    => Set.empty
-    case Instr.Set(cc, dest)       => Set(dest)
-    case _                         => Set.empty
+    case Instr.PushQ(arg)                => Set(Rsp)
+    case Instr.PopQ(arg)                 => readArg(arg) ++ Set(Rsp)
+    case Instr.RetQ                      => Set.empty
+    case Instr.CmpQ(lower, higher)       => Set.empty
+    case Instr.MovZBQ(src, dest)         => Set(dest)
+    case Instr.Jmp(label)                => Set.empty
+    case Instr.JmpIf(cc, label)          => Set.empty
+    case Instr.Set(cc, dest)             => Set(dest)
+    case Instr.LoadQ(dest, base, offset) => Set(dest)
+    case Instr.StoreQ(base, offset, arg) => Set.empty
+    case _                               => Set.empty
 
   /** Performs a backward data-flow analysis to uncover live variables in the
     * given x86Var.Program.
@@ -343,11 +347,6 @@ object RegisterAllocation {
       case reg: x86.Reg         => reg
       case byteReg: x86.ByteReg => byteReg
 
-      case x86Var.Deref(loc, offset) =>
-        rewriteLocation(loc) match
-          case r: x86.Reg => x86.Deref(r, offset)
-          case other      => sys error f"expected a Register, but got $other"
-
       case variable: x86Var.Variable =>
         homes.get(variable) match
           case Some(location) =>
@@ -372,10 +371,6 @@ object RegisterAllocation {
     // Rewrite locations in instructions to use the assigned homes
     // and spill locations, while also tracking the maximum spill offset used.
     def rewriteLocation(loc: x86Var.Location): x86.Location = loc match {
-      case x86Var.Deref(loc, offset) =>
-        rewriteLocation(loc) match
-          case r: x86.Reg => x86.Deref(r, offset)
-          case other      => sys error f"expected a Register, but got $other"
 
       case variable: x86Var.Variable =>
         rewriteArg(variable).asInstanceOf[x86.Location]
@@ -413,7 +408,16 @@ object RegisterAllocation {
         x86Instr.Set(cc, rewriteLocation(dest))
       case x86Var.Jmp(label)       => x86Instr.Jmp(label)
       case x86Var.JmpIf(cc, label) => x86Instr.JmpIf(cc, label)
-
+      case x86Var.LoadQ(dest, base, offset) =>
+        x86Instr.MovQ(
+          x86.Deref(rewriteArg(base).asInstanceOf[x86.Reg], offset),
+          rewriteLocation(dest)
+        )
+      case x86Var.StoreQ(base, offset, src) =>
+        x86Instr.MovQ(
+          rewriteArg(src),
+          x86.Deref(rewriteLocation(base).asInstanceOf[x86.Reg], offset) 
+        )
       case _ => sys.error(s"Unsupported instruction: $instr")
     }
 

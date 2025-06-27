@@ -240,14 +240,12 @@ object x86Var {
    */
   case class Immediate(n: Long)
 
-  case class Deref(loc: Location, offset: Long)
-
   /** A location in x86VarIf can be a register or a variable.
     *
     * Registers are used for fast access to data, while variables represent
     * memory locations that may require stack allocation.
     */
-  type Location = x86.Reg | x86.ByteReg | x86.Deref | x86.Global | Variable | x86Var.Deref
+  type Location = x86.Reg | x86.ByteReg | x86.Deref | x86.Global | Variable 
 
   /** An argument in x86VarIf can be a location (register or variable) or an
     * immediate value (constant).
@@ -279,4 +277,8 @@ object x86Var {
     case TailJmp(arg: Arg, arity: Int)
     case AndQ(src: Arg, dest: Location)
     case SarQ(src: Arg, dest: Location)
+
+    // additional instructions to model read and write operation to the Heap
+    case LoadQ(dest: Variable, base: Variable, offset: Long)
+    case StoreQ(base: Variable, offset: Long, src: Arg)
 }

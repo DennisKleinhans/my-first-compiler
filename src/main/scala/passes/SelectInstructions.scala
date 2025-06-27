@@ -7,6 +7,7 @@ import CIr.Tail
 import x86.Reg
 import x86Var.Immediate
 import CommonNodes.*
+import compiler.x86Var.Variable
 
 object SelectInstructions {
 
@@ -123,10 +124,7 @@ object SelectInstructions {
 
         case CIr.Load(ptr, offset) =>
           List(
-            x86Var.MovQ(
-              x86Var.Deref(LocFromAtom(ptr), offset),
-              x86Var.Variable(id)
-            )
+           x86Var.LoadQ(Variable(id), argFromAtom(ptr).asInstanceOf[Variable], offset)
           )
 
         case _ => Nil
@@ -151,7 +149,7 @@ object SelectInstructions {
 
     case CIr.StoreStmt(ptr, offset, value) =>
       List(
-        x86Var.MovQ(argFromAtom(value), x86Var.Deref(LocFromAtom(ptr), offset))
+        x86Var.StoreQ(argFromAtom(ptr).asInstanceOf[Variable], offset, argFromAtom(value))
       )
 
   /** Lower a CIr.Tail into a sequence of x86Var.Instr. Handles Return (moving

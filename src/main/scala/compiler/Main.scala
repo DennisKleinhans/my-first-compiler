@@ -26,9 +26,14 @@ def main(): Unit =
 
   val program =
     """
-  t = {10, 20, 30, 40}
-  b = t._3
+  t = {5, 15}
+  x = t._0
+  y = t._1
+  print(x + y)
   """
+
+
+  
   val parsed = parse(program)
   val sexped = LCoreReader.fromSExpToModule(parsed)
   val shrinked = shrink(sexped)
