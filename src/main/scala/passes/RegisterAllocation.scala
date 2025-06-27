@@ -45,6 +45,7 @@ object RegisterAllocation {
   )
 
   val callerSavedRegisters = Set(Rax, Rcx, Rdx, Rsi, Rdi, R8, R9, R10, R11)
+  val calleeSavedRegisters = Set(Rsp, Rbp, Rbx, R12, R13, R15, R15)
 
   /** Builds a basic block graph from the given x86Var.Program. Each block is
     * represented by its label, and edges are created based on the control flow
@@ -130,8 +131,8 @@ object RegisterAllocation {
     case Instr.NegQ(arg)       => readArg(arg)
     case Instr.CallQ("print_int", arity) =>
       Set(
-        Rdi
-      ) // only Rdi is used for print, because print has only one argument
+        Rdi // only Rdi is used for as argument register for print
+      ) ++ calleeSavedRegisters.asInstanceOf[Set[x86Var.Location]]
     case Instr.PushQ(arg)          => readArg(arg)
     case Instr.PopQ(arg)           => Set.empty
     case Instr.RetQ                => Set(Rax) // Ret reads Rax
@@ -155,7 +156,7 @@ object RegisterAllocation {
     case Instr.SubQ(src, dest) => Set(dest)
     case Instr.NegQ(arg)       => Set(arg)
     case Instr.CallQ(lable, arity) =>
-      Set(Rax) // only consider the register for the return value
+      callerSavedRegisters.asInstanceOf[Set[x86Var.Location]]
     case Instr.PushQ(arg)          => Set(Rsp)
     case Instr.PopQ(arg)           => readArg(arg) ++ Set(Rsp)
     case Instr.RetQ                => Set.empty
@@ -341,10 +342,12 @@ object RegisterAllocation {
       case x86Var.Immediate(n)  => x86.Immediate(n)
       case reg: x86.Reg         => reg
       case byteReg: x86.ByteReg => byteReg
-      case deref: x86.Deref =>
-        sys error s"Unexpected deref: $deref in assignHomes (rewriteArg)"
-      case global: x86.Global =>
-        sys error s"Unexpected global: $global in assignHomes (rewriteArg)"
+
+      case x86Var.Deref(loc, offset) =>
+        rewriteLocation(loc) match
+          case r: x86.Reg => x86.Deref(r, offset)
+          case other      => sys error f"expected a Register, but got $other"
+
       case variable: x86Var.Variable =>
         homes.get(variable) match
           case Some(location) =>
@@ -360,25 +363,27 @@ object RegisterAllocation {
           case None =>
             sys.error(s"Variable $variable has no home assigned")
 
-      case x86Var.Deref(loc, offset) =>
-        rewriteLocation(loc) match
-          case r: x86.Reg => x86.Deref(r, offset)
-          case other      => sys error f"expected a Register, but got $other"
+      case deref: x86.Deref => deref
+      case global: x86.Global =>
+        sys error s"Unexpected global: $global in assignHomes (rewriteArg)"
 
     }
 
     // Rewrite locations in instructions to use the assigned homes
     // and spill locations, while also tracking the maximum spill offset used.
     def rewriteLocation(loc: x86Var.Location): x86.Location = loc match {
-      case variable: x86Var.Variable =>
-        rewriteArg(variable).asInstanceOf[x86.Location]
-      case reg: x86.Reg         => reg
-      case byteReg: x86.ByteReg => byteReg
       case x86Var.Deref(loc, offset) =>
         rewriteLocation(loc) match
           case r: x86.Reg => x86.Deref(r, offset)
           case other      => sys error f"expected a Register, but got $other"
-      case other => sys.error(s"Unexpected location: $other")
+
+      case variable: x86Var.Variable =>
+        rewriteArg(variable).asInstanceOf[x86.Location]
+
+      case reg: x86.Reg         => reg
+      case byteReg: x86.ByteReg => byteReg
+      case deref: x86.Deref     => deref
+      case other                => sys.error(s"Unexpected location: $other")
     }
 
     // Rewrite each instruction in the program to use the assigned homes
