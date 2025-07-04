@@ -1,0 +1,11 @@
+def even(n: int) -> int {
+  if (n == 0) { return 1 }
+  else { return odd(n - 1) }
+}
+
+def odd(n: int) -> int {
+  if (n == 0) { return 0 }
+  else { return even(n - 1) }
+}
+
+print(even(6))

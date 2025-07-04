@@ -10,12 +10,24 @@ case class ParserError(message: String) extends RuntimeException(message)
 object tags {
   val Module = Symbol("Module")
 
+  // Def :=
+  val Fun = Symbol("Fun")
+
+  val Param = Symbol("Param")
+
+  // Type :=
+  val TBase  = Symbol("TBase")
+  val TTuple = Symbol("TTuple")
+  val TArray = Symbol("TArray")
+  val TFun   = Symbol("TFun")
+
   // Stmt :=
   val If     = Symbol("If")
   val Expr   = Symbol("Expr")
   val Assign = Symbol("Assign")
   val ArrayAssign = Symbol("ArrayAssign")
   val While = Symbol("While")
+  val Return = Symbol("Return")
 
   // BinaryOp :=
   val Add = Symbol("Add")
@@ -49,7 +61,8 @@ object tags {
   // for LArray
   val Array     = Symbol("Array")
   val ArraySubscript = Symbol("ArraySubscript")
-
+  // for LLambda
+  val Lambda = Symbol("Lambda")
 }
 
 class Parser(tokens: Iterator[Token]) {
@@ -80,9 +93,40 @@ class Parser(tokens: Iterator[Token]) {
       case t                   => throw ParserError(s"Expected $tokenType but got $t")
     }
 
-  def parseModule(): SExp = exhaust { Node(Module, stmts()) }
+  def parseModule(): SExp = exhaust { Node(Module, defs(), stmts()) }
   def parseExp(): SExp    = exhaust { exp() }
   def parseStmt(): SExp   = exhaust { stmt() }
+  def parseToplevel(): SExp = exhaust {
+    if (peek == DEF) { definition() } else { stmt() }
+  }
+  def parseType(): SExp   = exhaust { tpe() }
+
+  private def defs(): SExp = {
+    var definitions = List[SExp]()
+
+    while (currentToken == DEF) {
+      definitions = definitions :+ definition()
+    }
+
+    Node(definitions)
+  }
+
+  private def definition(): SExp =
+    // def id(x: tpe, ...) -> tpe { stmts }
+    consume(DEF)
+    Node(Fun, ident(), Node(manySep(param, LPAREN, COMMA, RPAREN)), { consume(ARR); tpe() },
+      braces(stmts()))
+
+  // x: tpe
+  private def param(): SExp =
+    Node(Param, ident(), { consume(COLON); tpe() })
+
+  private def ident(): SExp = peek match {
+    case i: IDENT =>
+      skip()
+      Symbol(i.value)
+    case _ => throw ParserError(s"Expected identifier")
+  }
 
   private def stmts(): SExp = {
     var statements = List[SExp]()
@@ -103,6 +147,9 @@ class Parser(tokens: Iterator[Token]) {
         val cond = parens { exp() }
         val body = braces { stmts() }
         Node(While, cond, body)
+      case RETURN =>
+        consume(RETURN)
+        Node(Return, exp())
       case IF =>
         consume(IF)
         peek match {
@@ -201,14 +248,12 @@ class Parser(tokens: Iterator[Token]) {
     }
 
   private def call(): SExp = {
-    val callee = primitive()
+    var callee = primitive()
 
-    peek match {
-      // it's a call! (right now, no arguments)
-      case Token.LPAREN =>
-        Node(Call, callee, arguments())
-      case _ => callee
+    while (peek == Token.LPAREN) {
+      callee = Node(Call, callee, arguments())
     }
+    callee
   }
 
   private def arguments(): SExp =
@@ -221,6 +266,7 @@ class Parser(tokens: Iterator[Token]) {
         value
       case t => throw ParserError(s"Number expected, got token: $t")
     }
+
   private def primitive(): SExp =
     peek match {
       case IF =>
@@ -236,7 +282,16 @@ class Parser(tokens: Iterator[Token]) {
         val elements = many(exp, LBRACKET, COMMA, RBRACKET)
         Node(Array, Node(elements))
       case LPAREN =>
-        parens { exp() }
+        consume(LPAREN)
+        if (peek == RPAREN) {
+          consume(RPAREN);
+          Node(Constant, Symbol("unit"))
+        }
+        else {
+          val result = exp()
+          consume(RPAREN)
+          result
+        }
       case NUMBER(value) =>
         skip()
         Node(Constant, Number(value))
@@ -246,10 +301,37 @@ class Parser(tokens: Iterator[Token]) {
       case FALSE =>
         skip()
         Node(False)
+      // lambda (x, y, ...) { stmts* }
+      case LAMBDA =>
+        skip()
+        val params = manySep(ident, LPAREN, COMMA, RPAREN)
+        val body   = braces(stmts())
+        Node(Lambda, Node(params), body)
+
       case i: IDENT =>
         skip()
         Node(Variable, Symbol(i.value))
       case t => throw ParserError(s"Unexpected token: $t")
+    }
+
+  // Types
+  def tpe(): SExp =
+    peek match {
+      case IDENT(base) if List("bool", "void", "int").contains(base) =>
+        skip()
+        Node(TBase, Symbol(base))
+      case IDENT("tuple") =>
+        skip()
+        Node(TTuple, Node(manySep(tpe, LBRACKET, COMMA, RBRACKET)))
+      case IDENT("array") =>
+        skip()
+        Node(TArray, brackets { tpe() })
+      case LPAREN =>
+        val paramTypes = manySep(tpe, LPAREN, COMMA, RPAREN)
+        consume(ARR)
+        val returnType = tpe()
+        Node(TFun, Node(paramTypes), returnType)
+      case t => throw ParserError(s"Unexpected token in type: $t")
     }
 
   // Helpers
@@ -265,6 +347,12 @@ class Parser(tokens: Iterator[Token]) {
     consume(RCURLY)
     res
 
+  inline def brackets[T](p: => T): T =
+    consume(LBRACKET)
+    val res = p
+    consume(RBRACKET)
+    res
+
   inline def many[T](p: () => T, before: Token, sep: Token, after: Token): List[T] =
     consume(before)
     if (peek == after) {
@@ -275,6 +363,17 @@ class Parser(tokens: Iterator[Token]) {
       consume(after)
       elements
     }
+
+  inline def manySep[T](p: () => T, before: Token, sep: Token, after: Token): List[T] =
+    consume(before)
+    val elements = if (peek == after) {
+      Nil
+    } else {
+      some(p, sep)
+    }
+    consume(after)
+    elements
+
 
   inline def some[T](p: () => T, sep: Token): List[T] =
     val components: mutable.ListBuffer[T] = mutable.ListBuffer.empty
@@ -289,3 +388,4 @@ class Parser(tokens: Iterator[Token]) {
 def parse(in: String): SExp = Parser(Lexer(in)).parseModule()
 def parseExp(in: String): SExp = Parser(Lexer(in)).parseExp()
 def parseStmt(in: String): SExp = Parser(Lexer(in)).parseStmt()
+def parseToplevel(in: String): SExp = Parser(Lexer(in)).parseToplevel()

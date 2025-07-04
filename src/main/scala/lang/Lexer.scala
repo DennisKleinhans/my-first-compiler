@@ -8,15 +8,18 @@ enum Token {
   case LCURLY, RCURLY               // { }
   case LBRACKET, RBRACKET           // [ ]
   case UNDERSCORE
-  case PLUS, MINUS, EQUAL, MULT    // Operators: + - = *
-  case EQ, NEQ, LT, LE, GT, GE, IS  // Operators == != <= > >= Is
+  case PLUS, MINUS, EQUAL, MULT     // Operators: + - = *
+  case EQ, NEQ, LT, LE, GT, GE, IS  // Operators == != <= > >= is
   case AND, OR, NOT                 // && || !
   case TRUE, FALSE                  // true false
   case NUMBER(value: Long)          // 123
   case IDENT(value: String)         // input_int print
-  case EOF                          // End of input
   case IF, THEN, ELSE
   case WHILE
+  case DEF, RETURN                  // function keywords: def return
+  case ARR                          // Type operator ->
+  case EOF                          // End of input
+  case LAMBDA                       // keyword: lambda
 }
 
 class Lexer(input: String) extends Iterator[Token] {
@@ -98,7 +101,10 @@ class Lexer(input: String) extends Iterator[Token] {
         Token.PLUS
       case '-' =>
         skip()
-        Token.MINUS
+        currentChar match {
+          case '>' => skip(); Token.ARR // ->
+          case _ => Token.MINUS
+        }
       case '*' =>
         skip()
         Token.MULT
@@ -142,13 +148,16 @@ class Lexer(input: String) extends Iterator[Token] {
         readNumber()
       case c if c.isLetter || c == '_' =>
         readIdent() match {
-          case Token.IDENT("if")    => Token.IF
-          case Token.IDENT("while") => Token.WHILE
-          case Token.IDENT("then")  => Token.THEN
-          case Token.IDENT("else")  => Token.ELSE
-          case Token.IDENT("true")  => Token.TRUE
-          case Token.IDENT("false") => Token.FALSE
-          case Token.IDENT("is")    => Token.IS
+          case Token.IDENT("if")     => Token.IF
+          case Token.IDENT("while")  => Token.WHILE
+          case Token.IDENT("then")   => Token.THEN
+          case Token.IDENT("else")   => Token.ELSE
+          case Token.IDENT("true")   => Token.TRUE
+          case Token.IDENT("false")  => Token.FALSE
+          case Token.IDENT("is")     => Token.IS
+          case Token.IDENT("def")    => Token.DEF
+          case Token.IDENT("return") => Token.RETURN
+          case Token.IDENT("lambda") => Token.LAMBDA
           case other => other
         }
       case _ => throw LexerError(s"Unexpected character '${currentChar}' at position $pos")

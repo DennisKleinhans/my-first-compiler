@@ -16,13 +16,15 @@ enum Instr {
   case XorQ(src: Arg, dest: Location)
   case CmpQ(lower: Arg, higher: Arg)
   case MovZBQ(src: Arg, dest: Location)
-  case LeaQ(arg: Arg, reg: Reg)
+  case LeaQ(arg: Arg, reg: Location)
   case Jmp(label: String)
   case JmpIf(cc: Cc, label: String)
   case Set(cc: Cc, dest: Location)
   case TailJmp(arg: Arg, arity: Int)
   case AndQ(src: Arg, dest: Location)
   case SarQ(src: Arg, dest: Location)
+  case SalQ(src: Arg, dest: Location)
+  case OrQ(src: Arg, dest: Location)
 }
 
 enum Cc {
