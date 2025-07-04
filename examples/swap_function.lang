@@ -1,0 +1,7 @@
+def swap(t: tuple[int, int]) -> tuple[int, int] {
+  return {t._1, t._0}
+}
+
+s = swap({5, 9})
+print(s._0)
+print(s._1)

@@ -27,13 +27,15 @@ def format(i: Instr): String = i match {
   case Instr.XorQ(src, dest)     => f"xorq ${format(src)}, ${format(dest)}"
   case Instr.CmpQ(lower, higher) => f"cmpq ${format(lower)}, ${format(higher)}"
   case Instr.MovZBQ(src, dest)   => f"movzbq ${format(src)}, ${format(dest)}"
-  case Instr.LeaQ(arg, reg)      => f"leaq ${format(arg)}, %%${format(reg)}"
+  case Instr.LeaQ(arg, dest)     => f"leaq ${format(arg)}, ${format(dest)}"
   case Instr.Jmp(label)          => f"jmp $label"
   case Instr.JmpIf(cc, label)    => f"j${format(cc)} $label"
   case Instr.Set(cc, dest)       => f"set${format(cc)} ${format(dest)}"
   case Instr.TailJmp(arg, _)     => f"jmp *${format(arg)}"
   case Instr.AndQ(src, dest)     => f"andq ${format(src)}, ${format(dest)}"
   case Instr.SarQ(src,dest)      => f"sarq ${format(src)}, ${format(dest)}"
+  case Instr.SalQ(src, dest)     => f"salq ${format(src)}, ${format(dest)}"
+  case Instr.OrQ(src, dest)      => f"orq ${format(src)}, ${format(dest)}"
 }
 
 def format(cc: Cc): String = cc match {
