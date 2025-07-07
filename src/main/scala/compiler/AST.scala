@@ -51,6 +51,8 @@ object CommonNodes {
     case Is
 
   case class Identifier(name: String)
+
+  case class Param(name: String)
 }
 
 /** The abstract syntax tree (AST) for the LWhile language.
@@ -63,12 +65,14 @@ object LCore {
   export Expr.*
   export Stmt.*
 
+  case class FunctionDef(name: String, params: List[Param], body: List[Stmt])
+
   /** A module is the top-level program structure in LWhile.
     *
     * @param stmts
     *   the list of statements contained in the module
     */
-  case class Module(stmts: List[Stmt])
+  case class Module(funDefs: List[FunctionDef], stmts: List[Stmt])
 
   /** A statement in LWhile represents either a standalone expression, a print
     * operation, an assign operation, a if Statement or a while statement.
@@ -79,6 +83,7 @@ object LCore {
     case AssignStmt(id: Identifier, e: Expr)
     case IfStmt(cond: Expr, thenBranch: List[Stmt], elseBranch: List[Stmt])
     case WhileStmt(cond: Expr, body: List[Stmt])
+    case ReturnStmt(expr: Expr)
 
   /** An expression in LWhile can be a constant value (Long or Boolean), a
     * Variable, a unary operation, a binary operation a function call, a compare
@@ -98,6 +103,7 @@ object LCore {
     case Tuple(elements: List[Expr])
     case TupleProjection(tuple: Expr, index: Long)
     case TupleLen(tuple: Expr)
+    case Call(name: String, args: List[Expr])
 }
 
 /** The abstract syntax tree (AST) for the LMonWhile language.
@@ -116,7 +122,8 @@ object LMon {
     * @param stmts
     *   the list of statements contained in the module
     */
-  case class Module(stmts: List[Stmt])
+  case class Module(funDefs: List[FunctionDef])
+  case class FunctionDef(name: String, params: List[Param], body: List[Stmt])
 
   /** A statement in LMonWhile represents either a standalone expression, a
     * print operation, an assign operation, a if statement or a while statement.
@@ -128,6 +135,7 @@ object LMon {
     case IfStmt(cond: Expr, thenBranch: List[Stmt], elseBranch: List[Stmt])
     case WhileStmt(cond: Expr, body: List[Stmt])
     case StoreStmt(ptr: Atom, offset: Int, value: Atom)
+    case ReturnStmt(atom: Atom)
 
   /** An expression in LMonWhile can be a constant value (Long or Boolean), a
     * unary operation, a binary operation, a function call with the restriction
@@ -147,6 +155,7 @@ object LMon {
     case Begin(stmts: List[Stmt], e: Expr)
     case Allocate(size: Long)
     case Load(ptr: Atom, offset: Long)
+    case Call(name: String, args: List[Atom])
 }
 
 /** The abstract syntax tree (AST) for the CIf language.
@@ -182,6 +191,7 @@ object CIr {
     case ReadIntCall
     case Allocate(size: Long)
     case Load(ptr: Atom, offset: Long)
+    case Call(name: String, args: List[Atom])
 
   /** A statement in CIf represents either a standalone expression, a print
     * operation or an assign operation.
@@ -204,6 +214,12 @@ object CIr {
     */
   case class BasicBlock(stmts: List[Stmt], tail: Tail)
 
+  case class FunctionDef(
+      name: String,
+      params: List[Param],
+      body: Map[Label, BasicBlock]
+  )
+
   /** A C program in CIf represents a collection of blocks, where each block is
     * identified by a unique name (String) and contains a list of statements and
     * a tail.
@@ -211,8 +227,8 @@ object CIr {
     * @param blocks
     */
   case class CProgram(
-      blocks: Map[Label, BasicBlock]
-  ) // also here we could use Identifier instead of String
+      funDefs: List[FunctionDef]
+  )
 
 }
 
@@ -226,7 +242,9 @@ object x86Var {
   import CommonNodes.Identifier
   export Instr.*
 
-  case class Program(blocks: Map[String, List[x86Var.Instr]])
+  case class FunctionDef(name: String, body: Map[String, List[x86Var.Instr]])
+
+  case class Program(funDefs: List[FunctionDef])
 
   /*
    * An identifier in x86VarIf represents a variable name or label.
@@ -245,7 +263,7 @@ object x86Var {
     * Registers are used for fast access to data, while variables represent
     * memory locations that may require stack allocation.
     */
-  type Location = x86.Reg | x86.ByteReg | x86.Deref | x86.Global | Variable 
+  type Location = x86.Reg | x86.ByteReg | x86.Deref | x86.Global | Variable
 
   /** An argument in x86VarIf can be a location (register or variable) or an
     * immediate value (constant).
