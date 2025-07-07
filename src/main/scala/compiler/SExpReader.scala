@@ -124,6 +124,9 @@ object LCoreReader {
         ) =>
       LCore.TupleLen(fromSExpToExpr(tupleVar))
 
+    case Node(Symbol("Call") :: Node(Symbol("Variable") :: Symbol(name) :: Nil) :: Node(args) :: Nil) =>
+      LCore.Call(name, args.map(fromSExpToExpr))
+
     case other =>
       sys.error(s"invalid expression: $other")
 
@@ -164,6 +167,9 @@ object LCoreReader {
     case Node(Symbol("While") :: test :: Node(body) :: Nil) =>
       LCore.WhileStmt(fromSExpToExpr(test), body.map(fromSExpToStmt))
 
+    case Node(Symbol("Return") :: (exprNode :: Nil)) =>
+      LCore.ReturnStmt(fromSExpToExpr(exprNode))
+
     case other =>
       sys.error(s"invalid statement: $other")
 
@@ -177,13 +183,47 @@ object LCoreReader {
     *   if the S-Expression does not represent a valid `Module`
     */
   def fromSExpToModule(sexp: SExp): LCore.Module = sexp match
-    case Node(Symbol("Module") :: rest) =>
-      // rest may be a direct list of stmts or a single wrapper node
-      val stmtNodes = rest match
-        case List(Node(inner)) => inner
-        case many              => many
-      LCore.Module(stmtNodes.map(fromSExpToStmt))
+    case Node(Symbol("Module") :: Node(funs) :: Node(stmtsNode) :: Nil) =>
+      val funDefs = funs.map(fromSExpToFunDef)
+      val stmts = stmtsNode.map(fromSExpToStmt)
+      LCore.Module(funDefs, stmts)
 
     case other =>
       sys.error(s"invalid module: $other")
+
+  /** Converts an S-Expression into a corresponding `FunctionDef`.
+    *
+    * @param sexp
+    *   the `SExp` to convert
+    * @return
+    *   a corresponding `FunctionDef`
+    * @throws java.lang.RuntimeException
+    *   if the S-Expression does not represent a valid `FunctionDef`
+    */
+  def fromSExpToFunDef(sexp: SExp): LCore.FunctionDef = sexp match
+    case Node(
+          Symbol("Fun") :: Symbol(name) :: Node(paramsSexp) :: Node(
+            returnType
+          ) :: Node(body) :: Nil
+        ) =>
+      val params = paramsSexp.map(fromSExpToParam)
+      val bodyStmts = body.map(fromSExpToStmt)
+      LCore.FunctionDef(name, params, bodyStmts)
+    case other => sys error "got in FunDef: " + other
+
+  /** Converts an S-Expression into a corresponding `Param`.
+    *
+    * @param sexp
+    *   the `SExp` to convert
+    * @return
+    *   a corresponding `Param`
+    * @throws java.lang.RuntimeException
+    *   if the S-Expression does not represent a valid `Param`
+    */
+  def fromSExpToParam(sexp: SExp): Param = sexp match
+    case Node(Symbol("Param") :: Symbol(name) :: _) =>
+      Param(name)
+
+    case other => sys error "got in Param: " + other
+
 }
