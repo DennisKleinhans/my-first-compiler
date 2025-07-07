@@ -588,23 +588,31 @@ class ShrinkTests extends FunSuite {
     assertEquals(shrink(nestedAndInAssign), expected)
   }
 
-  test("shrinkModule - assing and print") {
-    val input = LCore.Module(nestedAndInAssign :: nestedAndInPrint :: Nil)
+  test("shrinkModule - assign and print") {
+    val input =
+      LCore.Module(List.empty, nestedAndInAssign :: nestedAndInPrint :: Nil)
     val expected = LCore.Module(
-      (LCore.AssignStmt(
-        Identifier("x"),
-        LCore.IfExpr(
-          LCore.Constant(1),
-          LCore.Constant(2),
-          LCore.ConstantBool(false)
+      List(
+        LCore.FunctionDef(
+          "main",
+          Nil,
+          (LCore.AssignStmt(
+            Identifier("x"),
+            LCore.IfExpr(
+              LCore.Constant(1),
+              LCore.Constant(2),
+              LCore.ConstantBool(false)
+            )
+          )) :: LCore.PrintStmt(
+            LCore.IfExpr(
+              LCore.Constant(1),
+              LCore.Constant(2),
+              LCore.ConstantBool(false)
+            )
+          ) :: LCore.ReturnStmt(LCore.Constant(0)) :: Nil
         )
-      )) :: LCore.PrintStmt(
-        LCore.IfExpr(
-          LCore.Constant(1),
-          LCore.Constant(2),
-          LCore.ConstantBool(false)
-        )
-      ) :: Nil
+      ),
+      Nil
     )
     assertEquals(shrink(input), expected)
   }
@@ -615,6 +623,7 @@ class EndToEndTests extends FunSuite {
     val printCall = "print(1+1)"
 
     val expected = LCore.Module(
+      List.empty,
       LCore.PrintStmt(
         LCore.BinaryNumericOp(
           BinaryNumericOperator.Add,
@@ -629,6 +638,7 @@ class EndToEndTests extends FunSuite {
   test("End-to-End: object language -> AST - IfExpr") {
     val input = "if 1 < 2 then true else false"
     val expected = LCore.Module(
+      List.empty,
       LCore.ExprStmt(
         LCore.IfExpr(
           LCore.Compare(
@@ -647,6 +657,7 @@ class EndToEndTests extends FunSuite {
   test("End-to-End: object language -> AST - IfStmt") {
     val input = "if (1 < 2) {true} else {false}"
     val expected = LCore.Module(
+      List.empty,
       LCore.IfStmt(
         LCore
           .Compare(CompareOperator.Lt, LCore.Constant(1), LCore.Constant(2)),
@@ -660,6 +671,7 @@ class EndToEndTests extends FunSuite {
   test("End-to-End: object language -> AST - BinaryLogicOp") {
     val input = "true && false"
     val expected = LCore.Module(
+      List.empty,
       LCore.ExprStmt(
         LCore.BinaryLogicOp(
           BinaryLogicOperator.And,
@@ -674,6 +686,7 @@ class EndToEndTests extends FunSuite {
   test("End-to-End: object language -> AST - UnaryLogicOp") {
     val input = "!(1 < 2)"
     val expected = LCore.Module(
+      List.empty,
       LCore.ExprStmt(
         LCore.UnaryLogicOp(
           UnaryLogicOperator.Not,

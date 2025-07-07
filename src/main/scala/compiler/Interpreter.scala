@@ -45,7 +45,7 @@ object LIntInterpreter {
     *   the result of the last statement or [[Unit]] if none
     */
   def evalModule(module: LCore.Module): Long | Unit = module match
-    case LCore.Module(stmts) =>
+    case LCore.Module(funDefs, stmts) =>
       stmts.map(evalStatement).lastOption.getOrElse(())
 
   /** Partially evaluates an expression by constant folding
@@ -101,6 +101,6 @@ object LIntInterpreter {
     *   a simplified [[Module]]
     */
   def partialEvalModule(module: LCore.Module): LCore.Module = module match
-    case LCore.Module(stmts) =>
-      LCore.Module(stmts.map(partialEvalStatement))
+    case LCore.Module(funDefs, stmts) =>
+      LCore.Module(funDefs, stmts.map(partialEvalStatement))
 }
