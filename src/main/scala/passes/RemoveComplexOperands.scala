@@ -195,6 +195,15 @@ object RemoveComplexOperands {
 
       (assignments :+ loadAssign, AtomExpr(ptrVar))
 
+    case LCore.Call(name, args) =>
+      val (assignments, simpleArgs) = args.foldLeft(
+        (List.empty[LMon.Stmt], List.empty[Atom])
+      ) { case ((assignAcc, atomAcc), expr) =>
+        val (assigns, atom) = removeComplexOperands(expr, gen)
+        (assignAcc ++ assigns, atomAcc :+ extractAtom(atom))
+      }
+      (assignments, LMon.Call(name, simpleArgs))
+
     case e @ LCore.BinaryLogicOp(_, _, _) =>
       sys error s"rached BinaryLogicOp ($e), but this should not happen, because this would be removed in the shrink pass"
 
@@ -260,6 +269,10 @@ object RemoveComplexOperands {
           )
         )
 
+      case LCore.ReturnStmt(e) =>
+        val (assignments, expr) = removeComplexOperands(e, gen)
+        assignments :+ LMon.ReturnStmt(extractAtom(expr))
+
       /** Simplifies all statements in a module by flattening expressions
         * throughout.
         *
@@ -276,6 +289,12 @@ object RemoveComplexOperands {
       module: LCore.Module,
       gen: NameGenerator = NameGenerator()
   ): LMon.Module =
-    val simplifiedStmts = module.stmts.flatMap(removeComplexOperands(_, gen))
-    LMon.Module(simplifiedStmts)
+    val funDefs = module.funDefs.map { funDef =>
+      LMon.FunctionDef(
+        funDef.name,
+        funDef.params,
+        funDef.body.flatMap(removeComplexOperands(_, gen))
+      )
+    }
+    LMon.Module(funDefs)
 }
