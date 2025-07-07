@@ -7,6 +7,7 @@ import CIr.Tail
 import x86.Reg
 import x86Var.Immediate
 import CommonNodes.*
+import compiler.x86Var.Variable
 
 object SelectInstructions {
 
@@ -23,6 +24,10 @@ object SelectInstructions {
     case Atom.Variable(id)    => x86Var.Variable(id)
     case Atom.ConstantBool(b) => x86Var.Immediate(if b then 1 else 0)
 
+  def LocFromAtom(atom: Atom): x86Var.Location = argFromAtom(atom) match
+    case x86Var.Variable(id) => x86Var.Variable(id)
+    case other             => sys error f"expected a Variable, but got $other"
+
   /** Convert a CommonNodes.CompareOperator to an x86.Cc (condition code).
     *
     * @param op
@@ -37,6 +42,8 @@ object SelectInstructions {
     case CompareOperator.LtE   => x86.Cc.Le
     case CompareOperator.Gt    => x86.Cc.G
     case CompareOperator.GtE   => x86.Cc.Ge
+    case CompareOperator.Is =>
+      x86.Cc.E // the Is comparsion compares the adresses of tuples, so we translate it simply to an equality comparsion regarding an adress comparsion
 
   /** Convert a CIr.CProgram (map from label → BasicBlock) into an
     * x86Var.Program. Each BasicBlock’s statements and tail are lowered to
@@ -67,7 +74,7 @@ object SelectInstructions {
     */
   def lowerStmt(stmt: CIr.Stmt): List[x86Var.Instr] = stmt match
     case CIr.AssignStmt(id, expr) =>
-      expr match
+      expr match {
         case AtomExpr(atom) =>
           List(x86Var.MovQ(argFromAtom(atom), x86Var.Variable(id)))
         case CIr.UnaryNumericOp(op, atom) =>
@@ -108,7 +115,20 @@ object SelectInstructions {
             x86Var.MovQ(x86.Reg.Rax, x86Var.Variable(id))
           )
 
+        case CIr.Allocate(size) =>
+          List(
+            x86Var.MovQ(Immediate(size), Reg.Rdi),
+            x86Var.CallQ("allocate", 1),
+            x86Var.MovQ(Reg.Rax, x86Var.Variable(id))
+          )
+
+        case CIr.Load(ptr, offset) =>
+          List(
+           x86Var.LoadQ(Variable(id), argFromAtom(ptr).asInstanceOf[Variable], offset)
+          )
+
         case _ => Nil
+      }
 
     case CIr.PrintStmt(a) =>
       List(
@@ -126,6 +146,11 @@ object SelectInstructions {
             x86Var.CallQ("read_int", 0)
           )
         case _ => Nil
+
+    case CIr.StoreStmt(ptr, offset, value) =>
+      List(
+        x86Var.StoreQ(argFromAtom(ptr).asInstanceOf[Variable], offset, argFromAtom(value))
+      )
 
   /** Lower a CIr.Tail into a sequence of x86Var.Instr. Handles Return (moving
     * the return value to RAX and jumping to "conclusion"), Goto (unconditional

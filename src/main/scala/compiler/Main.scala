@@ -21,70 +21,31 @@ import optimization.NoOpElimination.eliminateNoOps
 
 @main
 def main(): Unit =
-  val path = "examples/loop_compound.lang"
-  compile(Paths.get(path))
-//   val parsed = parse(
-//     """
-// x = 0
-// while (x-1 < 3 ) {
-//   print(x)
-//   x = x + 1
-// }
-//   """
-//   )
+  // val path = "examples/loop_compound.lang"
+  // compile(Paths.get(path))
 
-// val prog = selectInstructions(
-//   explicateControl(
-//     removeComplexOperands(shrink(LIfReader.fromSExpToModule(parsed)))
-//   )
-// )
+  val program =
+    """
+  t = {5, 15}
+  x = t._0
+  y = t._1
+  print(x + y)
+  """
 
-// val live = uncoverLive(prog)
-// println("Live variables: " + live)
-// val interGraph = interferenceGraph(live)
-// println("Interference Graph: " + interGraph)
-// val coloring = dsatur(interGraph, Map.empty)
-// println("coloring: " + coloring)
-// val homes = homesFor(coloring)
-// println("homes: " + homes)
-// val assignedHomes = assignHomes(prog, homes)
-// println("assignedHomes: " + assignedHomes)
 
-// val (assignedHomes, stackSpace) = allocateRegisters(prog)
-// println("assigend Homes: " + assignedHomes)
-// val patchedInstr = patchInstructions(assignedHomes)
-// println("patched Instructions: " + patchedInstr)
-// // val noOps = eliminateNoOps(patchedInstr)
-// val finalProg = generatePreludeAndConclusion(patchedInstr, stackSpace)
-// println("final Programm: " + finalProg)
-
-// val graph = basicblockGraph(prog)
-// // println("selected instructions: " + prog)
-// println("Basic Block Graph: " + graph)
-// dumpGraph(
-//   prog.blocks,
-//   graph,
-//   instr => instr.toString,
-//   "graph.png"
-// )
-
-// println("after parse: " + parsed)
-// val sexped = LIfReader.fromSExpToModule(parsed)
-// println("after sexp: " + sexped)
-// val shrinked = shrinkModule(sexped)
-// println("after shrink: " + shrinked)
-// val removedComplex = simplifyModule(shrinked)
-// println("after removedComplexOperands: " + removedComplex)
-// val controlled = explicateControl(removedComplex)
-// println("after explicateControll: " + controlled)
-// val selctedInstructions = selectInstructions(controlled)
-// println("after selectInstructions: " + selctedInstructions)
-// val (assignedHomes, stackSpace) = allocateRegisters(selctedInstructions)
-// println("after assignHomes: " + assignedHomes)
-// val patchedInstructions = patchInstructions(assignedHomes)
-// println("after patchInstructions: " + patchedInstructions)
-// val finalProg = preludeAndConclusion(patchedInstructions, stackSpace)
-// println("after preludeAndConclusion: " + finalProg)
+  
+  val parsed = parse(program)
+  val sexped = LCoreReader.fromSExpToModule(parsed)
+  val shrinked = shrink(sexped)
+  val removed = removeComplexOperands(shrinked)
+  val controlled = explicateControl(removed)
+  val selected = selectInstructions(controlled)
+  val (instrsWithHome, stackSpace) = allocateRegisters(selected)
+  println("before removed: " + shrinked)
+  println("after removed: " + removed)
+  println("controlled: " + controlled)
+  println("selected: " + selected)
+  println("after register allocation: " + instrsWithHome)
 
 def compile(input: Path): Path = {
   val basename = input.getFileName.toString.replace(".lang", "")
@@ -93,6 +54,8 @@ def compile(input: Path): Path = {
   val target = transformTox86(sexped)
   assemble(target, basename)
 }
+
+
 
 def transformTox86(prog: SExp): Program = {
   val parsed = LCoreReader.fromSExpToModule(prog)

@@ -45,6 +45,7 @@ object RegisterAllocation {
   )
 
   val callerSavedRegisters = Set(Rax, Rcx, Rdx, Rsi, Rdi, R8, R9, R10, R11)
+  val calleeSavedRegisters = Set(Rsp, Rbp, Rbx, R12, R13, R15, R15)
 
   /** Builds a basic block graph from the given x86Var.Program. Each block is
     * represented by its label, and edges are created based on the control flow
@@ -130,17 +131,19 @@ object RegisterAllocation {
     case Instr.NegQ(arg)       => readArg(arg)
     case Instr.CallQ("print_int", arity) =>
       Set(
-        Rdi
-      ) // only Rdi is used for print, because print has only one argument
-    case Instr.PushQ(arg)          => readArg(arg)
-    case Instr.PopQ(arg)           => Set.empty
-    case Instr.RetQ                => Set(Rax) // Ret reads Rax
-    case Instr.CmpQ(lower, higher) => readArg(lower) ++ readArg(higher)
-    case Instr.MovZBQ(src, dest)   => readArg(src)
-    case Instr.Jmp(label)          => Set.empty
-    case Instr.JmpIf(cc, label)    => Set.empty
-    case Instr.Set(cc, dest)       => Set.empty
-    case _                         => Set.empty
+        Rdi // only Rdi is used for as argument register for print
+      ) ++ calleeSavedRegisters.asInstanceOf[Set[x86Var.Location]]
+    case Instr.PushQ(arg)                => readArg(arg)
+    case Instr.PopQ(arg)                 => Set.empty
+    case Instr.RetQ                      => Set(Rax) // Ret reads Rax
+    case Instr.CmpQ(lower, higher)       => readArg(lower) ++ readArg(higher)
+    case Instr.MovZBQ(src, dest)         => readArg(src)
+    case Instr.Jmp(label)                => Set.empty
+    case Instr.JmpIf(cc, label)          => Set.empty
+    case Instr.Set(cc, dest)             => Set.empty
+    case Instr.LoadQ(dest, base, offset) => Set(base)
+    case Instr.StoreQ(base, offset, arg) => Set(base) ++ readArg(arg)
+    case _                               => Set.empty
 
   /** Returns the set of locations that are written by the given instruction.
     *
@@ -155,16 +158,18 @@ object RegisterAllocation {
     case Instr.SubQ(src, dest) => Set(dest)
     case Instr.NegQ(arg)       => Set(arg)
     case Instr.CallQ(lable, arity) =>
-      Set(Rax) // only consider the register for the return value
-    case Instr.PushQ(arg)          => Set(Rsp)
-    case Instr.PopQ(arg)           => readArg(arg) ++ Set(Rsp)
-    case Instr.RetQ                => Set.empty
-    case Instr.CmpQ(lower, higher) => Set.empty
-    case Instr.MovZBQ(src, dest)   => Set(dest)
-    case Instr.Jmp(label)          => Set.empty
-    case Instr.JmpIf(cc, label)    => Set.empty
-    case Instr.Set(cc, dest)       => Set(dest)
-    case _                         => Set.empty
+      callerSavedRegisters.asInstanceOf[Set[x86Var.Location]]
+    case Instr.PushQ(arg)                => Set(Rsp)
+    case Instr.PopQ(arg)                 => readArg(arg) ++ Set(Rsp)
+    case Instr.RetQ                      => Set.empty
+    case Instr.CmpQ(lower, higher)       => Set.empty
+    case Instr.MovZBQ(src, dest)         => Set(dest)
+    case Instr.Jmp(label)                => Set.empty
+    case Instr.JmpIf(cc, label)          => Set.empty
+    case Instr.Set(cc, dest)             => Set(dest)
+    case Instr.LoadQ(dest, base, offset) => Set(dest)
+    case Instr.StoreQ(base, offset, arg) => Set.empty
+    case _                               => Set.empty
 
   /** Performs a backward data-flow analysis to uncover live variables in the
     * given x86Var.Program.
@@ -282,12 +287,12 @@ object RegisterAllocation {
   /** Assigns homes to variables based on their coloring.
     *
     * @param coloring
-    *   A mapping from x86Var.Location to Color, where each location is
-    *   assigned a color representing its register or spill location.
+    *   A mapping from x86Var.Location to Color, where each location is assigned
+    *   a color representing its register or spill location.
     * @return
-    *   A mapping from x86Var.Variable to x86Var.Location, where each
-    *   variable is assigned a home location (either a physical register or a
-    *   spill location).
+    *   A mapping from x86Var.Variable to x86Var.Location, where each variable
+    *   is assigned a home location (either a physical register or a spill
+    *   location).
     */
   def homesFor(
       coloring: Map[x86Var.Location, Color]
@@ -322,9 +327,9 @@ object RegisterAllocation {
     *   The x86Var.Program to rewrite, which contains a set of blocks with
     *   instructions.
     * @param homes
-    *   A mapping from x86Var.Variable to x86Var.Location, where each
-    *   variable is assigned a home location (either a physical register or a
-    *   spill location).
+    *   A mapping from x86Var.Variable to x86Var.Location, where each variable
+    *   is assigned a home location (either a physical register or a spill
+    *   location).
     * @return
     *   A tuple containing the rewritten x86.Program and the maximum spill
     *   offset used in the program.
@@ -341,10 +346,7 @@ object RegisterAllocation {
       case x86Var.Immediate(n)  => x86.Immediate(n)
       case reg: x86.Reg         => reg
       case byteReg: x86.ByteReg => byteReg
-      case deref: x86.Deref =>
-        sys error s"Unexpected deref: $deref in assignHomes (rewriteArg)"
-      case global: x86.Global =>
-        sys error s"Unexpected global: $global in assignHomes (rewriteArg)"
+
       case variable: x86Var.Variable =>
         homes.get(variable) match
           case Some(location) =>
@@ -360,15 +362,22 @@ object RegisterAllocation {
           case None =>
             sys.error(s"Variable $variable has no home assigned")
 
+      case deref: x86.Deref => deref
+      case global: x86.Global =>
+        sys error s"Unexpected global: $global in assignHomes (rewriteArg)"
+
     }
 
     // Rewrite locations in instructions to use the assigned homes
     // and spill locations, while also tracking the maximum spill offset used.
     def rewriteLocation(loc: x86Var.Location): x86.Location = loc match {
+
       case variable: x86Var.Variable =>
         rewriteArg(variable).asInstanceOf[x86.Location]
+
       case reg: x86.Reg         => reg
       case byteReg: x86.ByteReg => byteReg
+      case deref: x86.Deref     => deref
       case other                => sys.error(s"Unexpected location: $other")
     }
 
@@ -399,7 +408,16 @@ object RegisterAllocation {
         x86Instr.Set(cc, rewriteLocation(dest))
       case x86Var.Jmp(label)       => x86Instr.Jmp(label)
       case x86Var.JmpIf(cc, label) => x86Instr.JmpIf(cc, label)
-
+      case x86Var.LoadQ(dest, base, offset) =>
+        x86Instr.MovQ(
+          x86.Deref(rewriteArg(base).asInstanceOf[x86.Reg], offset),
+          rewriteLocation(dest)
+        )
+      case x86Var.StoreQ(base, offset, src) =>
+        x86Instr.MovQ(
+          rewriteArg(src),
+          x86.Deref(rewriteLocation(base).asInstanceOf[x86.Reg], offset) 
+        )
       case _ => sys.error(s"Unsupported instruction: $instr")
     }
 

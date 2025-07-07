@@ -113,8 +113,8 @@ object ExplicateControl {
     *   value is assigned. Its `.stmts` are appended after this assignment, and
     *   its `.tail` is used for the Goto in the new block.
     * @param basicBlocks
-    *   A mutable map from label -> CIr.BasicBlock, which is populated whenever a
-    *   new block is created. Any BasicBlock returned by this function must
+    *   A mutable map from label -> CIr.BasicBlock, which is populated whenever
+    *   a new block is created. Any BasicBlock returned by this function must
     *   already be inserted into `basicBlocks` under a fresh label.
     * @return
     *   The newly created CIr.BasicBlock (with its assignment prepended onto
@@ -446,6 +446,10 @@ object ExplicateControl {
         basicBlocks(condLbl) = condBlock
 
         CIr.BasicBlock(Nil, CIr.Goto(condLbl))
+
+      case LMon.StoreStmt(ptr, offset, value) =>
+        val store = CIr.StoreStmt(ptr, offset, value)
+        CIr.BasicBlock(store :: continuation.stmts, continuation.tail)
     }
   }
 
@@ -480,6 +484,8 @@ object ExplicateControl {
     case LMon.Compare(cmp, lhs, rhs) => CIr.Compare(cmp, lhs, rhs)
     case LMon.ReadIntCall            => CIr.ReadIntCall
     case LMon.AtomExpr(a)            => CIr.AtomExpr(a)
+    case LMon.Load(ptr, offset) => CIr.Load(ptr, offset)
+    case LMon.Allocate(size) => CIr.Allocate(size)
     case _ => sys error "cannot directly convert expression: " + expr
 
   /** The top‐level pass that translates an entire LMonIf.Module into a

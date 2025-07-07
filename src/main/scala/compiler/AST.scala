@@ -48,6 +48,7 @@ object CommonNodes {
     case LtE
     case Gt
     case GtE
+    case Is
 
   case class Identifier(name: String)
 }
@@ -94,6 +95,9 @@ object LCore {
     case ReadIntCall
     case Variable(id: Identifier)
     case IfExpr(condExpr: Expr, thenExpr: Expr, elseExpr: Expr)
+    case Tuple(elements: List[Expr])
+    case TupleProjection(tuple: Expr, index: Long)
+    case TupleLen(tuple: Expr)
 }
 
 /** The abstract syntax tree (AST) for the LMonWhile language.
@@ -123,6 +127,7 @@ object LMon {
     case ExprStmt(e: Expr)
     case IfStmt(cond: Expr, thenBranch: List[Stmt], elseBranch: List[Stmt])
     case WhileStmt(cond: Expr, body: List[Stmt])
+    case StoreStmt(ptr: Atom, offset: Int, value: Atom)
 
   /** An expression in LMonWhile can be a constant value (Long or Boolean), a
     * unary operation, a binary operation, a function call with the restriction
@@ -140,6 +145,8 @@ object LMon {
     case AtomExpr(a: Atom)
     case IfExpr(condExpr: Expr, thenExpr: Expr, elseExpr: Expr)
     case Begin(stmts: List[Stmt], e: Expr)
+    case Allocate(size: Long)
+    case Load(ptr: Atom, offset: Long)
 }
 
 /** The abstract syntax tree (AST) for the CIf language.
@@ -173,6 +180,8 @@ object CIr {
     case BinaryNumericOp(op: BinaryNumericOperator, lhs: Atom, rhs: Atom)
     case Compare(cmp: CompareOperator, lhs: Atom, rhs: Atom)
     case ReadIntCall
+    case Allocate(size: Long)
+    case Load(ptr: Atom, offset: Long)
 
   /** A statement in CIf represents either a standalone expression, a print
     * operation or an assign operation.
@@ -181,6 +190,7 @@ object CIr {
     case PrintStmt(a: Atom)
     case ExprStmt(e: Expr)
     case AssignStmt(id: Identifier, e: Expr)
+    case StoreStmt(ptr: Atom, offset: Int, value: Atom)
 
   /** A tail in CIf represents either a return, jump via goto or a conditional
     * jump via goto.
@@ -206,7 +216,7 @@ object CIr {
 
 }
 
-/** The x86VarIf intermediate representation (IR) for the LMonIf language.
+/** The x86Var intermediate representation (IR) for the LMon language.
   *
   * Represents the structure of LMonIf programs after instruction selection and
   * before final assembly generation.
@@ -235,7 +245,7 @@ object x86Var {
     * Registers are used for fast access to data, while variables represent
     * memory locations that may require stack allocation.
     */
-  type Location = x86.Reg | x86.ByteReg | x86.Deref | x86.Global | Variable
+  type Location = x86.Reg | x86.ByteReg | x86.Deref | x86.Global | Variable 
 
   /** An argument in x86VarIf can be a location (register or variable) or an
     * immediate value (constant).
@@ -267,4 +277,8 @@ object x86Var {
     case TailJmp(arg: Arg, arity: Int)
     case AndQ(src: Arg, dest: Location)
     case SarQ(src: Arg, dest: Location)
+
+    // additional instructions to model read and write operation to the Heap
+    case LoadQ(dest: Variable, base: Variable, offset: Long)
+    case StoreQ(base: Variable, offset: Long, src: Arg)
 }
