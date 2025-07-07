@@ -19,37 +19,73 @@ object AssignHomesToStack {
     * @return
     *   A list of concrete x86 instructions with resolved memory locations.
     */
-  def assignHomes(program: x86Var.Program): (x86.Program, Int) = {
-    val x86Var.Program(blocks) = program
+  def assignHomes(program: x86Var.Program): (x86.Program, Map[String, Int]) = {
 
-    val (finalBlocks, _, finalOffset) = blocks.foldLeft(
-      (Map.empty[String, List[x86.Instr]], Map.empty[Identifier, Int], -8)
-    ) {
-      case (
-            (processedBlocks, globalLocations, currentOffset),
-            (blockName, instrs)
-          ) =>
-        val (blockInstrs, updateddLocations, updatedOffset) =
-          instrs.foldLeft(
-            (List.empty[x86.Instr], globalLocations, currentOffset)
-          ) {
-            case ((translatedInstrs, currentLocations, currentOffset), instr) =>
-              val (translatedInstr, updatedLocations, updatedOffset) =
-                assignInstr(instr, currentLocations, currentOffset)
-              (
-                translatedInstrs :+ translatedInstr,
-                updatedLocations,
-                updatedOffset
-              )
-          }
+    // Für jede Funktion: führe deinen bisherigen Pass durch
+    val perFun: List[(Map[String, List[x86.Instr]], Int, String)] =
+      program.funDefs.map { funDef =>
+        // Starte fresh für jede Funktion
+        val initOffset = -8
+        val initLocs = Map.empty[Identifier, Int]
 
-        val updatedBlocks = processedBlocks.updated(blockName, blockInstrs)
-        (updatedBlocks, updateddLocations, updatedOffset)
-    }
+        // Faltung über alle BasicBlocks der Funktion
+        val (newBlocks, _, finalOffset) = funDef.body.foldLeft(
+          (Map.empty[String, List[x86.Instr]], initLocs, initOffset)
+        ) { case ((accBlocks, locs, off), (lbl, instrs)) =>
+          // übersetze jeden Instruktions-Block
+          val (translated, updatedLocs, updatedOff) =
+            instrs.foldLeft((List.empty[x86.Instr], locs, off)) {
+              case ((outInstrs, curLocs, curOff), instr) =>
+                val (ti, nl, no) = assignInstr(instr, curLocs, curOff)
+                (outInstrs :+ ti, nl, no)
+            }
+          (accBlocks.updated(lbl, translated), updatedLocs, updatedOff)
+        }
 
-    val stackSpace = -finalOffset
-    (x86.Program(finalBlocks), stackSpace)
+        val stackSize = -finalOffset
+        (newBlocks, stackSize, funDef.name)
+      }
+
+    // Alle Blocks aus allen Funktionen zusammenführen
+    val allBlocks: Map[String, List[x86.Instr]] =
+      perFun.foldLeft(Map.empty[String, List[x86.Instr]]) {
+        case (acc, (blocks, _, _)) => acc ++ blocks
+      }
+
+    // Map Funktion → StackSize
+    val stackSizes: Map[String, Int] =
+      perFun.map { case (_, sz, name) => name -> sz }.toMap
+
+    (x86.Program(allBlocks), stackSizes)
   }
+
+  // val (finalBlocks, _, finalOffset) = blocks.foldLeft(
+  //   (Map.empty[String, List[x86.Instr]], Map.empty[Identifier, Int], -8)
+  // ) {
+  //   case (
+  //         (processedBlocks, globalLocations, currentOffset),
+  //         (blockName, instrs)
+  //       ) =>
+  //     val (blockInstrs, updateddLocations, updatedOffset) =
+  //       instrs.foldLeft(
+  //         (List.empty[x86.Instr], globalLocations, currentOffset)
+  //       ) {
+  //         case ((translatedInstrs, currentLocations, currentOffset), instr) =>
+  //           val (translatedInstr, updatedLocations, updatedOffset) =
+  //             assignInstr(instr, currentLocations, currentOffset)
+  //           (
+  //             translatedInstrs :+ translatedInstr,
+  //             updatedLocations,
+  //             updatedOffset
+  //           )
+  //       }
+
+  //     val updatedBlocks = processedBlocks.updated(blockName, blockInstrs)
+  //     (updatedBlocks, updateddLocations, updatedOffset)
+  // }
+
+  // val stackSpace = -finalOffset
+  // (x86.Program(finalBlocks), stackSpace)
 
   /** Translates an abstract argument into a concrete one, allocating a new
     * stack slot for variables if needed.

@@ -16,7 +16,7 @@ import passes.RemoveComplexOperands.removeComplexOperands
 import passes.Shrink.shrink
 import passes.PatchInstructions.patchInstructions
 import passes.PreludeAndConclusion.generatePreludeAndConclusion
-import passes.RegisterAllocation.{allocateRegisters, basicblockGraph}
+// import passes.RegisterAllocation.{allocateRegisters, basicblockGraph}
 import optimization.NoOpElimination.eliminateNoOps
 
 @main
@@ -26,26 +26,29 @@ def main(): Unit =
 
   val program =
     """
-  t = {5, 15}
-  x = t._0
-  y = t._1
-  print(x + y)
+  def add(x : int, y : int) -> int {
+    return x + y
+  }
+  b = 2
+  print(add(b + 2, 2))
   """
 
+    
 
-  
   val parsed = parse(program)
+  println("parsed: " + parsed)
   val sexped = LCoreReader.fromSExpToModule(parsed)
+  println("sexped: " + sexped)
   val shrinked = shrink(sexped)
   val removed = removeComplexOperands(shrinked)
   val controlled = explicateControl(removed)
   val selected = selectInstructions(controlled)
-  val (instrsWithHome, stackSpace) = allocateRegisters(selected)
+  // val (instrsWithHome, stackSpace) = allocateRegisters(selected)
   println("before removed: " + shrinked)
   println("after removed: " + removed)
   println("controlled: " + controlled)
   println("selected: " + selected)
-  println("after register allocation: " + instrsWithHome)
+  // println("after register allocation: " + instrsWithHome)
 
 def compile(input: Path): Path = {
   val basename = input.getFileName.toString.replace(".lang", "")
@@ -55,19 +58,18 @@ def compile(input: Path): Path = {
   assemble(target, basename)
 }
 
-
-
 def transformTox86(prog: SExp): Program = {
   val parsed = LCoreReader.fromSExpToModule(prog)
   val shrinked = shrink(parsed)
   val withOutComplexOperands = removeComplexOperands(shrinked)
   val explicatedControl = explicateControl(withOutComplexOperands)
   val InstrsWithVar = selectInstructions(explicatedControl)
-  val (instrsWithHome, stackSpace) = allocateRegisters(InstrsWithVar)
-  val patchedInstrs = patchInstructions(instrsWithHome)
-  // val noOps = eliminateNoOps(patchedInstrs)
-  val finalProg = generatePreludeAndConclusion(patchedInstrs, stackSpace)
-  finalProg
+  // val (instrsWithHome, stackSpace) = allocateRegisters(InstrsWithVar)
+  // val patchedInstrs = patchInstructions(instrsWithHome)
+  // // val noOps = eliminateNoOps(patchedInstrs)
+  // val finalProg = generatePreludeAndConclusion(patchedInstrs, stackSpace)
+  // finalProg
+  ???
 }
 
 def readFile(path: Path): String = {

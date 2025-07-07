@@ -55,13 +55,18 @@ object SelectInstructions {
     *   a x86Var.Program containing the Map of lables to blocks
     */
   def selectInstructions(program: CIr.CProgram): x86Var.Program =
-    val selectedBlocks: Map[String, List[x86Var.Instr]] = program.blocks.map {
+    val selectedFunctions = program.funDefs.map(selectInstructions)
+    x86Var.Program(selectedFunctions)
+
+
+  def selectInstructions(funDef: CIr.FunctionDef): x86Var.FunctionDef =
+    val selectedBlocks: Map[String, List[x86Var.Instr]] = funDef.body.map {
       (lable, basicBlock) =>
         val stmtsInstrs = basicBlock.stmts.flatMap(lowerStmt)
         val tailInstrs = lowerTail(basicBlock.tail)
         lable -> (stmtsInstrs ++ tailInstrs)
     }
-    x86Var.Program(selectedBlocks)
+    x86Var.FunctionDef(funDef.name, selectedBlocks)
 
   /** Lower a single CIr.Stmt into a sequence of x86Var.Instr. Handles
     * AssignStmt (Atom, UnaryNumericOp, BinaryNumericOp, Compare, ReadIntCall),
