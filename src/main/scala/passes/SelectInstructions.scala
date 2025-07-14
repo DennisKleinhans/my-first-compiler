@@ -26,7 +26,7 @@ object SelectInstructions {
 
   def LocFromAtom(atom: Atom): x86Var.Location = argFromAtom(atom) match
     case x86Var.Variable(id) => x86Var.Variable(id)
-    case other             => sys error f"expected a Variable, but got $other"
+    case other               => sys error f"expected a Variable, but got $other"
 
   /** Convert a CommonNodes.CompareOperator to an x86.Cc (condition code).
     *
@@ -58,12 +58,11 @@ object SelectInstructions {
     val selectedFunctions = program.funDefs.map(selectInstructions)
     x86Var.Program(selectedFunctions)
 
-
   def selectInstructions(funDef: CIr.FunctionDef): x86Var.FunctionDef =
     val selectedBlocks: Map[String, List[x86Var.Instr]] = funDef.body.map {
       (lable, basicBlock) =>
         val stmtsInstrs = basicBlock.stmts.flatMap(lowerStmt)
-        val tailInstrs = lowerTail(basicBlock.tail)
+        val tailInstrs = lowerTail(basicBlock.tail, funDef.name)
         lable -> (stmtsInstrs ++ tailInstrs)
     }
     x86Var.FunctionDef(funDef.name, selectedBlocks)
@@ -129,7 +128,24 @@ object SelectInstructions {
 
         case CIr.Load(ptr, offset) =>
           List(
-           x86Var.LoadQ(Variable(id), argFromAtom(ptr).asInstanceOf[Variable], offset)
+            x86Var.LoadQ(
+              Variable(id),
+              argFromAtom(ptr).asInstanceOf[Variable],
+              offset
+            )
+          )
+
+        case CIr.Call(name, args) =>
+          // map all arguments to x86Var arguments and move them to the appropriate argument passing registers
+          // then call the function and move the result to the variable id
+          args
+            .map(argFromAtom)
+            .zipWithIndex
+            .map { case (arg, index) =>
+              x86Var.MovQ(arg, x86Var.argumentRegisters(index))
+            } ++ List(
+            x86Var.CallQ(name, args.length),
+            x86Var.MovQ(x86.Reg.Rax, x86Var.Variable(id))
           )
 
         case _ => Nil
@@ -150,11 +166,24 @@ object SelectInstructions {
           List(
             x86Var.CallQ("read_int", 0)
           )
+        // no return needed because it appears as an expression in a statement
+        case CIr.Call(name, args) =>
+          args.map(argFromAtom).zipWithIndex.map {
+            case (arg, index) =>
+              x86Var.MovQ(arg, x86Var.argumentRegisters(index))
+          } ++ List(
+            x86Var.CallQ(name, args.length)
+            //TODO: maybe return 0 in RAX and dont use it at all
+          )
         case _ => Nil
 
     case CIr.StoreStmt(ptr, offset, value) =>
       List(
-        x86Var.StoreQ(argFromAtom(ptr).asInstanceOf[Variable], offset, argFromAtom(value))
+        x86Var.StoreQ(
+          argFromAtom(ptr).asInstanceOf[Variable],
+          offset,
+          argFromAtom(value)
+        )
       )
 
   /** Lower a CIr.Tail into a sequence of x86Var.Instr. Handles Return (moving
@@ -167,29 +196,30 @@ object SelectInstructions {
     * @return
     *   a list of x86 instructions implementing the tail
     */
-  def lowerTail(tail: CIr.Tail): List[x86Var.Instr] = tail match
-    case CIr.Return(e) =>
-      e match
-        case CIr.AtomExpr(atom) =>
-          List(
-            x86Var.MovQ(argFromAtom(atom), Reg.Rax),
-            x86Var.Jmp("conclusion")
-          )
-        case _ =>
-          List(
-            x86Var.MovQ(x86Var.Immediate(0L), Reg.Rax),
-            x86Var.Jmp("conclusion")
-          )
+  def lowerTail(tail: CIr.Tail, funName: String): List[x86Var.Instr] =
+    tail match
+      case CIr.Return(e) =>
+        e match
+          case CIr.AtomExpr(atom) =>
+            List(
+              x86Var.MovQ(argFromAtom(atom), Reg.Rax),
+              x86Var.Jmp(funName + "_conclusion")
+            )
+          case _ =>
+            List(
+              x86Var.MovQ(x86Var.Immediate(0L), Reg.Rax),
+              x86Var.Jmp(funName + "_conclusion")
+            )
 
-    case CIr.Goto(lable) => List(x86Var.Jmp(lable))
+      case CIr.Goto(lable) => List(x86Var.Jmp(lable))
 
-    case CIr.If(cmp, thenGoto, elseGoto) =>
-      val cc = ccFromCompareOperator(cmp.cmp)
-      val src = argFromAtom(cmp.rhs)
-      val dest = argFromAtom(cmp.lhs)
-      List(
-        x86Var.CmpQ(src, dest),
-        x86Var.JmpIf(cc, thenGoto.lable),
-        x86Var.Jmp(elseGoto.lable)
-      )
+      case CIr.If(cmp, thenGoto, elseGoto) =>
+        val cc = ccFromCompareOperator(cmp.cmp)
+        val src = argFromAtom(cmp.rhs)
+        val dest = argFromAtom(cmp.lhs)
+        List(
+          x86Var.CmpQ(src, dest),
+          x86Var.JmpIf(cc, thenGoto.lable),
+          x86Var.Jmp(elseGoto.lable)
+        )
 }

@@ -242,6 +242,15 @@ object x86Var {
   import CommonNodes.Identifier
   export Instr.*
 
+  val argumentRegisters: List[x86.Reg] = List(
+    x86.Reg.Rdi, // first argument
+    x86.Reg.Rsi, // second argument
+    x86.Reg.Rdx, // third argument
+    x86.Reg.Rcx, // fourth argument
+    x86.Reg.R8, // fifth argument
+    x86.Reg.R9 // sixth argument
+  )
+
   case class FunctionDef(name: String, body: Map[String, List[x86Var.Instr]])
 
   case class Program(funDefs: List[FunctionDef])
