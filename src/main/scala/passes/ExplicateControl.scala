@@ -72,6 +72,18 @@ object ExplicateControl {
       bodyCounter += 1
       name + bodyCounter
     }
+
+    /** Produce a fresh label for a function entry point.
+      *
+      * @param prefix
+      *   A prefix for the label, typically the function name.
+      * @return
+      *   A new label of the form `prefix_entry`, where `prefix` is the provided
+      *   prefix.
+      */
+    def freshFunctionStartLabel(prefix: String): CIr.Label = {
+      prefix + "_start"
+    }
   }
 
   /** Translate a LMon expression into one or more CIr BasicBlocks that assign
@@ -522,7 +534,7 @@ object ExplicateControl {
     // entryBlock kommt jetzt als erster Block, der ausgeführt werden soll
 
     // 5) Trage den entryBlock noch unter dem Label "entry" ein
-    val entryLabel = LabelGenerator.freshBlockLabel()
+    val entryLabel = LabelGenerator.freshFunctionStartLabel(funDef.name)
     basicBlocks(entryLabel) = entryBlock
 
     // 6) Baue das CIr.FunctionDef
