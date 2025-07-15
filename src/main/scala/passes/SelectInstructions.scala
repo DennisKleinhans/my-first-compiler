@@ -8,6 +8,8 @@ import x86.Reg
 import x86Var.Immediate
 import CommonNodes.*
 import compiler.x86Var.Variable
+import compiler.CIr.BasicBlock
+import compiler.x86Var.Instr.MovQ
 
 object SelectInstructions {
 
@@ -61,9 +63,14 @@ object SelectInstructions {
   def selectInstructions(funDef: CIr.FunctionDef): x86Var.FunctionDef =
     val selectedBlocks: Map[String, List[x86Var.Instr]] = funDef.body.map {
       (lable, basicBlock) =>
+        val entryStmts = loadValuesFromArgumentRegisters(
+          lable,
+          basicBlock,
+          funDef.params
+        )
         val stmtsInstrs = basicBlock.stmts.flatMap(lowerStmt)
         val tailInstrs = lowerTail(basicBlock.tail, funDef.name)
-        lable -> (stmtsInstrs ++ tailInstrs)
+        lable -> (entryStmts ++ stmtsInstrs ++ tailInstrs)
     }
     x86Var.FunctionDef(funDef.name, selectedBlocks)
 
@@ -76,7 +83,7 @@ object SelectInstructions {
     * @return
     *   a list of x86 instructions implementing the statement
     */
-  def lowerStmt(stmt: CIr.Stmt): List[x86Var.Instr] = stmt match
+  def lowerStmt(stmt: CIr.Stmt): List[x86Var.Instr] = stmt match {
     case CIr.AssignStmt(id, expr) =>
       expr match {
         case AtomExpr(atom) =>
@@ -168,12 +175,11 @@ object SelectInstructions {
           )
         // no return needed because it appears as an expression in a statement
         case CIr.Call(name, args) =>
-          args.map(argFromAtom).zipWithIndex.map {
-            case (arg, index) =>
-              x86Var.MovQ(arg, x86Var.argumentRegisters(index))
+          args.map(argFromAtom).zipWithIndex.map { case (arg, index) =>
+            x86Var.MovQ(arg, x86Var.argumentRegisters(index))
           } ++ List(
             x86Var.CallQ(name, args.length)
-            //TODO: maybe return 0 in RAX and dont use it at all
+            // TODO: maybe return 0 in RAX and dont use it at all
           )
         case _ => Nil
 
@@ -185,6 +191,7 @@ object SelectInstructions {
           argFromAtom(value)
         )
       )
+  }
 
   /** Lower a CIr.Tail into a sequence of x86Var.Instr. Handles Return (moving
     * the return value to RAX and jumping to "conclusion"), Goto (unconditional
@@ -197,7 +204,7 @@ object SelectInstructions {
     *   a list of x86 instructions implementing the tail
     */
   def lowerTail(tail: CIr.Tail, funName: String): List[x86Var.Instr] =
-    tail match
+    tail match {
       case CIr.Return(e) =>
         e match
           case CIr.AtomExpr(atom) =>
@@ -222,4 +229,39 @@ object SelectInstructions {
           x86Var.JmpIf(cc, thenGoto.lable),
           x86Var.Jmp(elseGoto.lable)
         )
+    }
+
+  /** Load values from argument registers into the function parameters at the
+    * start of the function body. This is only done for the "start" label of the
+    * function, which is expected to be the entry point of the function.
+    * @param lable
+    *   the label of the basic block, expected to be "start" for the function
+    *   entry
+    * @param basicBlock
+    *   the basic block containing the function body
+    * @param funParams
+    *   the list of function parameters, which will be loaded from the argument
+    *   registers
+    * @return
+    *   a list of x86Var.Instr that move the values from the argument registers
+    *   to the corresponding function parameters
+    */
+  def loadValuesFromArgumentRegisters(
+      lable: String,
+      basicBlock: BasicBlock,
+      funParams: List[Param]
+  ): List[x86Var.Instr] = {
+    if (lable.endsWith("start") && funParams.length != 0) {
+      val stmts = funParams.zipWithIndex
+        .map { case (param, index) =>
+          x86Var.MovQ(
+            x86Var.argumentRegisters(index),
+            x86Var.Variable(Identifier(param.name))
+          )
+        }
+      stmts
+    } else {
+      Nil
+    }
+  }
 }
