@@ -179,7 +179,6 @@ object SelectInstructions {
             x86Var.MovQ(arg, x86Var.argumentRegisters(index))
           } ++ List(
             x86Var.CallQ(name, args.length)
-            // TODO: maybe return 0 in RAX and dont use it at all
           )
         case _ => Nil
 

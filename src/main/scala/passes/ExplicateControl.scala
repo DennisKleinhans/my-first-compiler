@@ -506,36 +506,29 @@ object ExplicateControl {
     case LMon.Call(name, arg)        => CIr.Call(name, arg)
     case _ => sys error "cannot directly convert expression: " + expr
 
+  /** Translate a LMonIf.FunctionDef into a CIr.FunctionDef. This function
+    * constructs the function body as a map of BasicBlocks, starting with a
+    * `startBlock` that contains the function’s entry point.
+    * @param funDef
+    *   The LMonIf.FunctionDef to translate.
+    * @return
+    *   The equivalent CIr.FunctionDef, with a map of BasicBlocks representing
+    *   the function body.
+    */
   def explicateFunctionDef(funDef: LMon.FunctionDef): CIr.FunctionDef = {
-    // 1) Wir erwarten eine non-empty body und dass das letzte Statement ein ReturnStmt ist
-    require(funDef.body.nonEmpty, "Function body must not be empty")
-    val lastStmt = funDef.body.last
-    lastStmt match {
-      case LMon.ReturnStmt(_) => ()
-      case other =>
-        sys.error(s"Every function must end in a return, but got: $other")
-    }
 
-    // 2) Map für alle erzeugten BasicBlocks
-    val basicBlocks = mutable.Map.empty[String, CIr.BasicBlock]
+    val basicBlocks = mutable.Map[String, CIr.BasicBlock]()
 
-    // 3) Erzeuge den Exit‑Block aus dem ReturnStmt
-    //    explicateStmt ignoriert bei ReturnStmt den 'continuation'-Parameter
-    //    und legt automatisch einen freshLabel‑Block mit CIr.Return an
-    val dummyCont =
-      CIr.BasicBlock(Nil, CIr.Return(CIr.AtomExpr(Constant(0L))))
-    val exitBlock = explicateStmt(lastStmt, dummyCont, basicBlocks)
-    // → exitBlock ist bereits unter einem freshLabel in basicBlocks gespeichert
+    // construct start block with Return(0) as tail.
+    // This tail sometimes leads to a dead end, but it is required to have a valid tail in the start block
+    // so that the function can be called without any issues.
+    val startBlock = funDef.body.foldRight(
+      CIr.BasicBlock(List.empty, CIr.Return(CIr.AtomExpr(Constant(0L))))
+    ) { (stmt, cont) => explicateStmt(stmt, cont, basicBlocks) }
 
-    // 4) FoldRight über alle Statements außer dem letzten
-    val entryBlock = funDef.body.init.foldRight(exitBlock) { (stmt, cont) =>
-      explicateStmt(stmt, cont, basicBlocks)
-    }
-    // entryBlock kommt jetzt als erster Block, der ausgeführt werden soll
-
-    // 5) Trage den entryBlock noch unter dem Label "entry" ein
-    val entryLabel = LabelGenerator.freshFunctionStartLabel(funDef.name)
-    basicBlocks(entryLabel) = entryBlock
+    // add startBlock
+    val startLabel = funDef.name + "_start"
+    basicBlocks(startLabel) = startBlock
 
     // 6) Baue das CIr.FunctionDef
     CIr.FunctionDef(
