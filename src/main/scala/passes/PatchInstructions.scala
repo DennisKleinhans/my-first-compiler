@@ -9,6 +9,16 @@ object PatchInstructions {
 
   def isTooBig(imm: Long): Boolean = imm > Int.MaxValue || imm < Int.MinValue
 
+  def patchProgWithFun(
+      progWithFuns: List[(String, x86.Program, Long)]
+  ): List[(String, x86.Program, Long)] = {
+    val patchedProgWithFuns = progWithFuns.map {
+      case (name, program, stackSpace) =>
+        (name, patchInstructionsProg(program), stackSpace)
+    }
+    patchedProgWithFuns
+  }
+
   /** Patches a x86 program to avoid illegal memory-to-memory operations and
     * immediates >32-bit by introducing the RAX register as an intermediate.
     *
@@ -18,7 +28,7 @@ object PatchInstructions {
     *   A patched x86 program with memory-to-memory moves replaced by two-step
     *   moves through RAX.
     */
-  def patchInstructions(program: x86.Program): x86.Program = {
+  def patchInstructionsProg(program: x86.Program): x86.Program = {
 
     val patchedBlocks = program.blocks.map { (label, instrs) =>
       label -> patchInstructions(instrs)
