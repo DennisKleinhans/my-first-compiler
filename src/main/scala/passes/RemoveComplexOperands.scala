@@ -271,7 +271,15 @@ object RemoveComplexOperands {
 
       case LCore.ReturnStmt(e) =>
         val (assignments, expr) = removeComplexOperands(e, gen)
-        assignments :+ LMon.ReturnStmt(extractAtom(expr))
+        expr match
+          case AtomExpr(a) =>
+            assignments :+ LMon.ReturnStmt(a)
+          case other =>
+            val tmpIdentifier = gen.freshName()
+            assignments ++ List(
+              LMon.AssignStmt(tmpIdentifier, other),
+              LMon.ReturnStmt(Atom.Variable(tmpIdentifier))
+            )
 
       /** Simplifies all statements in a module by flattening expressions
         * throughout.
