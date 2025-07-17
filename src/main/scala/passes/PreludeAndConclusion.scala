@@ -7,6 +7,21 @@ import x86.Immediate
 
 object PreludeAndConclusion {
 
+  def generatePreludeAndConclusion(
+      progWithFuns: List[(String, x86.Program, Long)]
+  ): x86.Program = {
+    val program = progWithFuns
+      .map { case (name, program, stackSpace) =>
+        generatePreludeAndConclusion(name, program, stackSpace)
+      }
+      .flatMap(_.blocks)
+      .groupBy(_._1)
+      .view
+      .mapValues(_.flatMap(_._2))
+      .toMap
+    x86.Program(program)
+  }
+
   /** Adds a prelude and conclusion to the x86 program. The prelude sets up the
     * stack frame and jumps to the "start" label. The conclusion restores the
     * stack frame and returns from the main function.
@@ -20,6 +35,7 @@ object PreludeAndConclusion {
     *   A new x86 program with the prelude and conclusion added.
     */
   def generatePreludeAndConclusion(
+      funName: String,
       program: x86.Program,
       stackSpace: Long
   ): x86.Program =
@@ -27,13 +43,15 @@ object PreludeAndConclusion {
     val alignedSpace =
       if stackSpace == 0 then 16 else ((stackSpace + 15) / 16) * 16
 
-    val mainBlock = List(
-      CallQ("initialize", 0),
-      PushQ(Reg.Rbp),
-      MovQ(Reg.Rsp, Reg.Rbp),
-      SubQ(Immediate(alignedSpace), Reg.Rsp),
-      Jmp("start")
-    )
+    val prelude =
+      List(
+        PushQ(Reg.Rbp),
+        MovQ(Reg.Rsp, Reg.Rbp),
+        SubQ(Immediate(alignedSpace), Reg.Rsp)
+      ) ++ (if (funName == "main") List(CallQ("initialize", 0))
+            else Nil) ++ List(
+        Jmp(funName + "_start")
+      )
 
     val conclusionBlock = List(
       AddQ(Immediate(alignedSpace), Reg.Rsp),
@@ -42,8 +60,8 @@ object PreludeAndConclusion {
     )
 
     val updatedBlocks = blocks ++ Map(
-      "main" -> mainBlock,
-      "conclusion" -> conclusionBlock
+      funName -> prelude,
+      funName + "_conclusion" -> conclusionBlock
     )
 
     x86.Program(updatedBlocks)
