@@ -410,6 +410,7 @@ class selectInstructionsTests extends FunSuite {
       List(
         x86Var.FunctionDef(
           "main",
+          Nil,
           Map(
             "main_start" -> List(
               x86Var.MovQ(
@@ -443,6 +444,7 @@ class selectInstructionsTests extends FunSuite {
       List(
         x86Var.FunctionDef(
           "main",
+          Nil,
           Map(
             "main_start" -> List(
               x86Var.CallQ("read_int", 0),
@@ -472,6 +474,7 @@ class selectInstructionsTests extends FunSuite {
       List(
         x86Var.FunctionDef(
           "main",
+          Nil,
           Map(
             "main_start" -> List(
               x86Var.MovQ(
