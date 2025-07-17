@@ -239,7 +239,7 @@ object CIr {
   */
 object x86Var {
   import x86.Cc
-  import CommonNodes.Identifier
+  import CommonNodes.{Identifier, Param}
   export Instr.*
 
   val argumentRegisters: List[x86.Reg] = List(
@@ -251,7 +251,11 @@ object x86Var {
     x86.Reg.R9 // sixth argument
   )
 
-  case class FunctionDef(name: String, body: Map[String, List[x86Var.Instr]])
+  case class FunctionDef(
+      name: String,
+      params: List[Param],
+      body: Map[String, List[x86Var.Instr]]
+  )
 
   case class Program(funDefs: List[FunctionDef])
 

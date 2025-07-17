@@ -72,7 +72,7 @@ object SelectInstructions {
         val tailInstrs = lowerTail(basicBlock.tail, funDef.name)
         lable -> (entryStmts ++ stmtsInstrs ++ tailInstrs)
     }
-    x86Var.FunctionDef(funDef.name, selectedBlocks)
+    x86Var.FunctionDef(funDef.name, funDef.params, selectedBlocks)
 
   /** Lower a single CIr.Stmt into a sequence of x86Var.Instr. Handles
     * AssignStmt (Atom, UnaryNumericOp, BinaryNumericOp, Compare, ReadIntCall),

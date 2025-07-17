@@ -10,6 +10,10 @@ import compiler.{x86Var, CommonNodes}
 import CommonNodes.Atom
 import x86Var.Instr
 import x86Var.Immediate
+import compiler.x86Var.argumentRegisters
+import lang.tags.Variable
+import java.security.Identity
+import compiler.CommonNodes.Identifier
 
 object RegisterAllocation {
 
@@ -45,7 +49,7 @@ object RegisterAllocation {
   )
 
   val callerSavedRegisters = Set(Rax, Rcx, Rdx, Rsi, Rdi, R8, R9, R10, R11)
-  val calleeSavedRegisters = Set(Rsp, Rbp, Rbx, R12, R13, R15, R15)
+  val calleeSavedRegisters = Set(Rsp, Rbp, Rbx, R12, R13, R14, R15)
 
   /** Builds a basic block graph from the given x86Var.Program. Each block is
     * represented by its label, and edges are created based on the control flow
@@ -129,10 +133,8 @@ object RegisterAllocation {
     case Instr.AddQ(src, dest) => readArg(src) ++ readArg(dest)
     case Instr.SubQ(src, dest) => readArg(src) ++ readArg(dest)
     case Instr.NegQ(arg)       => readArg(arg)
-    case Instr.CallQ("print_int", arity) =>
-      Set(
-        Rdi // only Rdi is used for as argument register for print
-      ) ++ calleeSavedRegisters.asInstanceOf[Set[x86Var.Location]]
+    case Instr.CallQ(label, arity) =>
+      argumentRegisters.take(arity).toSet
     case Instr.PushQ(arg)                => readArg(arg)
     case Instr.PopQ(arg)                 => Set.empty
     case Instr.RetQ                      => Set(Rax) // Ret reads Rax
@@ -264,9 +266,11 @@ object RegisterAllocation {
       instr match {
         // caller saved registers should interfere with all live variables at every call instruction
         case Instr.CallQ(_, _) =>
+      
           for {
             v <- liveAfter.filter(isTemp)
             r <- callerSavedRegisters
+            if v != r
           } {
             g = g ++ Graph.edge(v, r)
           }
@@ -300,6 +304,7 @@ object RegisterAllocation {
     // Inverted mapping: ColorID -> physical register
     val colorToReg: Map[Color, x86Var.Location] =
       registerColors.map { case (reg, col) => (col, reg) }
+    
 
     // Fold over variables to assign homes
     coloring.keys
@@ -448,7 +453,20 @@ object RegisterAllocation {
     program.funDefs.map { funDef =>
       val liveProg = uncoverLive(funDef)
       val graph = interferenceGraph(liveProg)
-      val coloring = dsatur(graph, callerSavedRegistersColors)
+      println(s"Interference graph: ${graph}")
+
+      val preColored: Map[x86Var.Location, Color] =
+        funDef.params
+          .zip(calleeSavedRegisters) // TODO: Das ist eine valide Lösung und sollte immer Funktionieren. Eine andere möglichkeit wäre, die Parameter in selectInstructions nicht den Argumentregistern zuzuordnen sondern das erst in der RegisterAllokation zu machen. (siehe auch nochmal den Chat: https://chatgpt.com/c/6877c3f2-1c80-8002-996d-6d86af20a63a)
+          .map { case (param, reg) =>
+            (x86Var.Variable(Identifier(param.name)) -> registerColors(reg))
+          }
+          .toMap
+      
+      println(s"Pre-colored registers: $preColored")
+
+      val coloring = dsatur(graph, registerColors ++ preColored) ++ preColored
+      println(s"Final coloring: $coloring")
       val homes = homesFor(coloring)
       val (prog, stackSpace) = assignHomes(funDef, homes)
       (funDef.name, prog, stackSpace)

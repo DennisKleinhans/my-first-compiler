@@ -28,7 +28,7 @@ object LCoreReader {
     case Symbol("Gt")  => CompareOperator.Gt
     case Symbol("Ge")  => CompareOperator.GtE
     case Symbol("Is")  => CompareOperator.Is
-    case _             => sys error "Not a supported compare operator"
+    case other            => sys error f" $other is not a supported compare operator"
 
   /** Converts an S-Expression into a corresponding `Expr`.
     *
