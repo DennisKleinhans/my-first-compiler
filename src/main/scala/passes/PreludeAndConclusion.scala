@@ -41,8 +41,7 @@ object PreludeAndConclusion {
       usedCalleeSavedRegisters: Set[x86.Reg]
   ): x86.Program =
     val x86.Program(blocks) = program
-    val alignedSpace =
-      if stackSpace == 0 then 16 else ((stackSpace + usedCalleeSavedRegisters.size + 15) / 16) * 16
+    val alignedSpace = computeAlignedStackSpace(stackSpace, usedCalleeSavedRegisters.size)
 
     val calleeSavedPushes = 
       usedCalleeSavedRegisters.toList.map(reg => Instr.PushQ(reg))
@@ -74,4 +73,11 @@ object PreludeAndConclusion {
     )
 
     x86.Program(updatedBlocks)
+
+  def computeAlignedStackSpace(stackSpace: Long, numPushes: Int): Long =
+    val bytesPushed = numPushes * 8
+    val baseAligned = ((stackSpace + 15) / 16) * 16
+    val misalignment = (bytesPushed + baseAligned) % 16
+    val fix = if misalignment == 8 then 0 else 8  
+    baseAligned + fix
 }
