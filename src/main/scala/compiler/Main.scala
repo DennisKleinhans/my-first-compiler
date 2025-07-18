@@ -40,66 +40,14 @@ def main(): Unit =
 
   val program3 =
     """
-def swap(t: tuple[int, int]) -> tuple[int, int] {
-  return {t._1, t._0}
-}
+  def swap(t: tuple[int, int]) -> tuple[int, int] {
+    return {t._1, t._0}
+  }
 
-s = swap({5, 9})
-print(s._0)
-print(s._1)
+  s = swap({5, 9})
+  print(s._0)
+  print(s._1)
   """
-
-  Program(
-    HashMap(
-      swap_start -> List(
-        MovQ(Rdi, Rbp),
-        MovQ(Immediate(24), Rdi),
-        CallQ(allocate, 1),
-        MovQ(Rax, Rcx),
-        MovQ(Immediate(2), Deref(Rcx, 0)),
-        MovQ(Deref(Rbp, 16), Rdx),
-        MovQ(Deref(Rbp, 8), Rsi),
-        MovQ(Rdx, Deref(Rcx, 8)),
-        MovQ(Rsi, Deref(Rcx, 16)),
-        MovQ(Rcx, Rax),
-        Jmp(swap_conclusion)
-      ),
-      swap_conclusion -> List(AddQ(Immediate(16), Rsp), PopQ(Rbp), RetQ),
-      main_conclusion -> List(AddQ(Immediate(16), Rsp), PopQ(Rbp), RetQ),
-      main -> List(
-        PushQ(Rbp),
-        MovQ(Rsp, Rbp),
-        SubQ(Immediate(16), Rsp),
-        CallQ(initialize, 0),
-        Jmp(main_start)
-      ),
-      swap -> List(
-        PushQ(Rbp),
-        MovQ(Rsp, Rbp),
-        SubQ(Immediate(16), Rsp),
-        Jmp(swap_start)
-      ),
-      main_start -> List(
-        MovQ(Immediate(24), Rdi),
-        CallQ(allocate, 1),
-        MovQ(Rax, Rcx),
-        MovQ(Immediate(2), Deref(Rcx, 0)),
-        MovQ(Immediate(5), Deref(Rcx, 8)),
-        MovQ(Immediate(9), Deref(Rcx, 16)),
-        MovQ(Rcx, Rdi),
-        CallQ(swap, 1),
-        MovQ(Rax, Rbx),
-        MovQ(Deref(Rbx, 8), Rcx),
-        MovQ(Rcx, Rdi),
-        CallQ(print_int, 1),
-        MovQ(Deref(Rbx, 16), Rcx),
-        MovQ(Rcx, Rdi),
-        CallQ(print_int, 1),
-        MovQ(Immediate(0), Rax),
-        Jmp(main_conclusion)
-      )
-    )
-  )
 
   val program2 =
     """
@@ -107,15 +55,15 @@ print(s._1)
       return x + y
     }
 
-    def do(x: int) -> int{ 
+    def doSomething(x: int) -> int{ 
       return add(x, 2)
     
     }
 
-    print(do(5))
+    print(doSomething(5))
     """
 
-  val parsed = parse(program3)
+  val parsed = parse(program2)
   println("parsed: " + parsed)
   val sexped = LCoreReader.fromSExpToModule(parsed)
   println("sexped: " + sexped)

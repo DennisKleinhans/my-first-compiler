@@ -4,6 +4,7 @@ import x86.*
 import x86.Instr
 import x86.Instr.*
 import x86.Immediate
+import passes.RegisterAllocation.calleeSavedRegisters
 
 object PreludeAndConclusion {
 
@@ -43,21 +44,29 @@ object PreludeAndConclusion {
     val alignedSpace =
       if stackSpace == 0 then 16 else ((stackSpace + 15) / 16) * 16
 
+    val calleeSavedPushes = 
+      calleeSavedRegisters.toList.map(reg => PushQ(reg))
+
+    val calleeSavedPops = 
+      calleeSavedRegisters.toList.map(reg => PopQ(reg)).reverse
+
     val prelude =
       List(
         PushQ(Reg.Rbp),
-        MovQ(Reg.Rsp, Reg.Rbp),
-        SubQ(Immediate(alignedSpace), Reg.Rsp)
+        MovQ(Reg.Rsp, Reg.Rbp)) ++ 
+        calleeSavedPushes ++
+        List(SubQ(Immediate(alignedSpace), Reg.Rsp)
       ) ++ (if (funName == "main") List(CallQ("initialize", 0))
             else Nil) ++ List(
         Jmp(funName + "_start")
       )
 
     val conclusionBlock = List(
-      AddQ(Immediate(alignedSpace), Reg.Rsp),
-      PopQ(Reg.Rbp),
-      RetQ
-    )
+      AddQ(Immediate(alignedSpace), Reg.Rsp)) ++
+      calleeSavedPops ++
+      List(PopQ(Reg.Rbp),
+      RetQ)
+    
 
     val updatedBlocks = blocks ++ Map(
       funName -> prelude,

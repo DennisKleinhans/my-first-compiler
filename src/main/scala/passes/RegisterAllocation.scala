@@ -266,7 +266,6 @@ object RegisterAllocation {
       instr match {
         // caller saved registers should interfere with all live variables at every call instruction
         case Instr.CallQ(_, _) =>
-      
           for {
             v <- liveAfter.filter(isTemp)
             r <- callerSavedRegisters
@@ -304,7 +303,6 @@ object RegisterAllocation {
     // Inverted mapping: ColorID -> physical register
     val colorToReg: Map[Color, x86Var.Location] =
       registerColors.map { case (reg, col) => (col, reg) }
-    
 
     // Fold over variables to assign homes
     coloring.keys
@@ -453,20 +451,18 @@ object RegisterAllocation {
     program.funDefs.map { funDef =>
       val liveProg = uncoverLive(funDef)
       val graph = interferenceGraph(liveProg)
-      println(s"Interference graph: ${graph}")
 
+      // move all the arguments to the callee saved registers and use them as pre-colored registers
+      // Note: we never push arguments to the stack, so we can pass not more than 6 arguments and we can use the callee saved registers for them
       val preColored: Map[x86Var.Location, Color] =
         funDef.params
-          .zip(calleeSavedRegisters) // TODO: Das ist eine valide Lösung und sollte immer Funktionieren. Eine andere möglichkeit wäre, die Parameter in selectInstructions nicht den Argumentregistern zuzuordnen sondern das erst in der RegisterAllokation zu machen. (siehe auch nochmal den Chat: https://chatgpt.com/c/6877c3f2-1c80-8002-996d-6d86af20a63a)
+          .zip(calleeSavedRegisters)
           .map { case (param, reg) =>
             (x86Var.Variable(Identifier(param.name)) -> registerColors(reg))
           }
           .toMap
-      
-      println(s"Pre-colored registers: $preColored")
 
       val coloring = dsatur(graph, registerColors ++ preColored) ++ preColored
-      println(s"Final coloring: $coloring")
       val homes = homesFor(coloring)
       val (prog, stackSpace) = assignHomes(funDef, homes)
       (funDef.name, prog, stackSpace)
