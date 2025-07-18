@@ -2,18 +2,17 @@ package passes
 
 import x86.*
 import x86.Instr
-import x86.Instr.*
 import x86.Immediate
 import passes.RegisterAllocation.calleeSavedRegisters
 
 object PreludeAndConclusion {
 
   def generatePreludeAndConclusion(
-      progWithFuns: List[(String, x86.Program, Long)]
+      progWithFuns: List[(String, x86.Program, Long, Set[x86.Reg])]
   ): x86.Program = {
     val program = progWithFuns
-      .map { case (name, program, stackSpace) =>
-        generatePreludeAndConclusion(name, program, stackSpace)
+      .map { case (name, program, stackSpace, usedCalleSaved) =>
+        generatePreludeAndConclusion(name, program, stackSpace, usedCalleSaved)
       }
       .flatMap(_.blocks)
       .groupBy(_._1)
@@ -38,34 +37,35 @@ object PreludeAndConclusion {
   def generatePreludeAndConclusion(
       funName: String,
       program: x86.Program,
-      stackSpace: Long
+      stackSpace: Long,
+      usedCalleeSavedRegisters: Set[x86.Reg]
   ): x86.Program =
     val x86.Program(blocks) = program
     val alignedSpace =
-      if stackSpace == 0 then 16 else ((stackSpace + 15) / 16) * 16
+      if stackSpace == 0 then 16 else ((stackSpace + usedCalleeSavedRegisters.size + 15) / 16) * 16
 
     val calleeSavedPushes = 
-      calleeSavedRegisters.toList.map(reg => PushQ(reg))
+      usedCalleeSavedRegisters.toList.map(reg => Instr.PushQ(reg))
 
     val calleeSavedPops = 
-      calleeSavedRegisters.toList.map(reg => PopQ(reg)).reverse
+      usedCalleeSavedRegisters.toList.map(reg => Instr.PopQ(reg)).reverse
 
     val prelude =
       List(
-        PushQ(Reg.Rbp),
-        MovQ(Reg.Rsp, Reg.Rbp)) ++ 
+        Instr.PushQ(Reg.Rbp),
+        Instr.MovQ(Reg.Rsp, Reg.Rbp)) ++ 
         calleeSavedPushes ++
-        List(SubQ(Immediate(alignedSpace), Reg.Rsp)
-      ) ++ (if (funName == "main") List(CallQ("initialize", 0))
+        List(Instr.SubQ(Immediate(alignedSpace), Reg.Rsp)
+      ) ++ (if (funName == "main") List(Instr.CallQ("initialize", 0))
             else Nil) ++ List(
-        Jmp(funName + "_start")
+        Instr.Jmp(funName + "_start")
       )
 
     val conclusionBlock = List(
-      AddQ(Immediate(alignedSpace), Reg.Rsp)) ++
+      Instr.AddQ(Immediate(alignedSpace), Reg.Rsp)) ++
       calleeSavedPops ++
-      List(PopQ(Reg.Rbp),
-      RetQ)
+      List(Instr.PopQ(Reg.Rbp),
+      Instr.RetQ)
     
 
     val updatedBlocks = blocks ++ Map(

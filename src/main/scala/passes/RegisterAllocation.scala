@@ -447,7 +447,7 @@ object RegisterAllocation {
     */
   def allocateRegisters(
       program: x86Var.Program
-  ): List[(String, x86.Program, Long)] = {
+  ): List[(String, x86.Program, Long, Set[x86.Reg])] = {
     program.funDefs.map { funDef =>
       val liveProg = uncoverLive(funDef)
       val graph = interferenceGraph(liveProg)
@@ -464,8 +464,14 @@ object RegisterAllocation {
 
       val coloring = dsatur(graph, registerColors ++ preColored) ++ preColored
       val homes = homesFor(coloring)
+
+      val usedCalleeSavedRegisters =
+        homes.values.collect {
+          case reg: x86.Reg if calleeSavedRegisters.contains(reg) => reg
+        }.toSet
+
       val (prog, stackSpace) = assignHomes(funDef, homes)
-      (funDef.name, prog, stackSpace)
+      (funDef.name, prog, stackSpace, usedCalleeSavedRegisters)
     }
 
   }
