@@ -5,6 +5,7 @@ import CommonNodes.Identifier
 import LMon.Expr
 import CommonNodes.*
 import CommonNodes.Atom.*
+import scala.collection.immutable.Stream.Cons
 
 object ExplicateControl {
 
@@ -71,6 +72,18 @@ object ExplicateControl {
       bodyCounter += 1
       name + bodyCounter
     }
+
+    /** Produce a fresh label for a function entry point.
+      *
+      * @param prefix
+      *   A prefix for the label, typically the function name.
+      * @return
+      *   A new label of the form `prefix_entry`, where `prefix` is the provided
+      *   prefix.
+      */
+    def freshFunctionStartLabel(prefix: String): CIr.Label = {
+      prefix + "_start"
+    }
   }
 
   /** Translate a LMon expression into one or more CIr BasicBlocks that assign
@@ -113,8 +126,8 @@ object ExplicateControl {
     *   value is assigned. Its `.stmts` are appended after this assignment, and
     *   its `.tail` is used for the Goto in the new block.
     * @param basicBlocks
-    *   A mutable map from label -> CIr.BasicBlock, which is populated whenever a
-    *   new block is created. Any BasicBlock returned by this function must
+    *   A mutable map from label -> CIr.BasicBlock, which is populated whenever
+    *   a new block is created. Any BasicBlock returned by this function must
     *   already be inserted into `basicBlocks` under a fresh label.
     * @return
     *   The newly created CIr.BasicBlock (with its assignment prepended onto
@@ -163,7 +176,7 @@ object ExplicateControl {
       case _ =>
         // Simple expressions (AtomExpr, ReadIntCall, UnaryNumericOp, BinaryNumericOp, Compare).
         // Generate exactly one BasicBlock to assign `id := <converted expr>` and then use continuation.tail.
-        val assignStmt = CIr.AssignStmt(id, convertExprToCIf(expr))
+        val assignStmt = CIr.AssignStmt(id, convertExprToCIr(expr))
         CIr.BasicBlock(assignStmt :: continuation.stmts, continuation.tail)
     }
   }
@@ -338,7 +351,7 @@ object ExplicateControl {
 
       case _ =>
         // A simple expression treated as a statement: generate one block with ExprStmt and Goto
-        val stmt = CIr.ExprStmt(convertExprToCIf(expr))
+        val stmt = CIr.ExprStmt(convertExprToCIr(expr))
         CIr.BasicBlock(stmt :: continuation.stmts, continuation.tail)
     }
   }
@@ -446,6 +459,14 @@ object ExplicateControl {
         basicBlocks(condLbl) = condBlock
 
         CIr.BasicBlock(Nil, CIr.Goto(condLbl))
+
+      case LMon.StoreStmt(ptr, offset, value) =>
+        val store = CIr.StoreStmt(ptr, offset, value)
+        CIr.BasicBlock(store :: continuation.stmts, continuation.tail)
+
+      case LMon.ReturnStmt(atom) =>
+        val retBlock = CIr.BasicBlock(Nil, CIr.Return(CIr.AtomExpr(atom)))
+        retBlock
     }
   }
 
@@ -473,14 +494,49 @@ object ExplicateControl {
     * @throws RuntimeException
     *   if `expr` cannot be directly converted.
     */
-  def convertExprToCIf(expr: LMon.Expr): CIr.Expr = expr match
+  def convertExprToCIr(expr: LMon.Expr): CIr.Expr = expr match
     case LMon.UnaryNumericOp(op, a) => CIr.UnaryNumericOp(op, a)
     case LMon.BinaryNumericOp(op, lhs, rhs) =>
       CIr.BinaryNumericOp(op, lhs, rhs)
     case LMon.Compare(cmp, lhs, rhs) => CIr.Compare(cmp, lhs, rhs)
     case LMon.ReadIntCall            => CIr.ReadIntCall
     case LMon.AtomExpr(a)            => CIr.AtomExpr(a)
+    case LMon.Load(ptr, offset)      => CIr.Load(ptr, offset)
+    case LMon.Allocate(size)         => CIr.Allocate(size)
+    case LMon.Call(name, arg)        => CIr.Call(name, arg)
     case _ => sys error "cannot directly convert expression: " + expr
+
+  /** Translate a LMonIf.FunctionDef into a CIr.FunctionDef. This function
+    * constructs the function body as a map of BasicBlocks, starting with a
+    * `startBlock` that contains the function’s entry point.
+    * @param funDef
+    *   The LMonIf.FunctionDef to translate.
+    * @return
+    *   The equivalent CIr.FunctionDef, with a map of BasicBlocks representing
+    *   the function body.
+    */
+  def explicateFunctionDef(funDef: LMon.FunctionDef): CIr.FunctionDef = {
+
+    val basicBlocks = mutable.Map[String, CIr.BasicBlock]()
+
+    // construct start block with Return(0) as tail.
+    // This tail sometimes leads to a dead end, but it is required to have a valid tail in the start block
+    // so that the function can be called without any issues.
+    val startBlock = funDef.body.foldRight(
+      CIr.BasicBlock(List.empty, CIr.Return(CIr.AtomExpr(Constant(0L))))
+    ) { (stmt, cont) => explicateStmt(stmt, cont, basicBlocks) }
+
+    // add startBlock
+    val startLabel = funDef.name + "_start"
+    basicBlocks(startLabel) = startBlock
+
+    // 6) Baue das CIr.FunctionDef
+    CIr.FunctionDef(
+      name = funDef.name,
+      params = funDef.params,
+      body = basicBlocks.toMap
+    )
+  }
 
   /** The top‐level pass that translates an entire LMonIf.Module into a
     * CIr.CProgram.
@@ -511,17 +567,22 @@ object ExplicateControl {
     *   control flow.
     */
   def explicateControl(module: LMon.Module): CIr.CProgram = {
-    val basicBlocks = mutable.Map[String, CIr.BasicBlock]()
 
-    // construct start block with Return(0) as tail
-    val startBlock = module.stmts.foldRight(
-      CIr.BasicBlock(List.empty, CIr.Return(CIr.AtomExpr(Constant(0L))))
-    ) { (stmt, cont) => explicateStmt(stmt, cont, basicBlocks) }
+    val funDefs = module.funDefs.map(explicateFunctionDef)
 
-    // add startBlock
-    val startLabel = "start"
-    basicBlocks(startLabel) = startBlock
+    CIr.CProgram(funDefs)
 
-    CIr.CProgram(basicBlocks.toMap)
+    // val basicBlocks = mutable.Map[String, CIr.BasicBlock]()
+
+    // // construct start block with Return(0) as tail
+    // val startBlock = module.stmts.foldRight(
+    //   CIr.BasicBlock(List.empty, CIr.Return(CIr.AtomExpr(Constant(0L))))
+    // ) { (stmt, cont) => explicateStmt(stmt, cont, basicBlocks) }
+
+    // // add startBlock
+    // val startLabel = "start"
+    // basicBlocks(startLabel) = startBlock
+
+    // CIr.CProgram(basicBlocks.toMap)
   }
 }

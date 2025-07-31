@@ -4,6 +4,8 @@ import compiler.{LCore, CommonNodes}
 import CommonNodes.*
 import LCore.Stmt
 import LCore.Expr
+import compiler.LCore.Stmt.ReturnStmt
+import compiler.LCore.Expr.Constant
 
 object Shrink {
 
@@ -13,7 +15,10 @@ object Shrink {
     * @return
     */
   def shrink(module: LCore.Module): LCore.Module =
-    LCore.Module(module.stmts.map(shrink))
+    val shrunkStmts = module.stmts.map(shrink)
+    // pack the stmts into a main function definition
+    val mainFunDef = LCore.FunctionDef("main", Nil, shrunkStmts :+ ReturnStmt(Constant(0)))
+    LCore.Module(mainFunDef :: module.funDefs, Nil)
 
   /** Shrinks a single statement by simplifying its expressions.
     *
@@ -32,6 +37,7 @@ object Shrink {
       )
     case LCore.WhileStmt(cond, body) =>
       LCore.WhileStmt(shrinkExpr(cond), body.map(shrink))
+    case LCore.ReturnStmt(e) => LCore.ReturnStmt(shrinkExpr(e))
 
   /** Shrinks an expression by simplifying its structure and removing
     * unnecessary complexity by replacing the `and` and `or` operators with if

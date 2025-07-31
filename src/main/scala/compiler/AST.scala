@@ -48,8 +48,11 @@ object CommonNodes {
     case LtE
     case Gt
     case GtE
+    case Is
 
   case class Identifier(name: String)
+
+  case class Param(name: String)
 }
 
 /** The abstract syntax tree (AST) for the LWhile language.
@@ -62,12 +65,14 @@ object LCore {
   export Expr.*
   export Stmt.*
 
+  case class FunctionDef(name: String, params: List[Param], body: List[Stmt])
+
   /** A module is the top-level program structure in LWhile.
     *
     * @param stmts
     *   the list of statements contained in the module
     */
-  case class Module(stmts: List[Stmt])
+  case class Module(funDefs: List[FunctionDef], stmts: List[Stmt])
 
   /** A statement in LWhile represents either a standalone expression, a print
     * operation, an assign operation, a if Statement or a while statement.
@@ -78,6 +83,7 @@ object LCore {
     case AssignStmt(id: Identifier, e: Expr)
     case IfStmt(cond: Expr, thenBranch: List[Stmt], elseBranch: List[Stmt])
     case WhileStmt(cond: Expr, body: List[Stmt])
+    case ReturnStmt(expr: Expr)
 
   /** An expression in LWhile can be a constant value (Long or Boolean), a
     * Variable, a unary operation, a binary operation a function call, a compare
@@ -94,6 +100,10 @@ object LCore {
     case ReadIntCall
     case Variable(id: Identifier)
     case IfExpr(condExpr: Expr, thenExpr: Expr, elseExpr: Expr)
+    case Tuple(elements: List[Expr])
+    case TupleProjection(tuple: Expr, index: Long)
+    case TupleLen(tuple: Expr)
+    case Call(name: String, args: List[Expr])
 }
 
 /** The abstract syntax tree (AST) for the LMonWhile language.
@@ -112,7 +122,8 @@ object LMon {
     * @param stmts
     *   the list of statements contained in the module
     */
-  case class Module(stmts: List[Stmt])
+  case class Module(funDefs: List[FunctionDef])
+  case class FunctionDef(name: String, params: List[Param], body: List[Stmt])
 
   /** A statement in LMonWhile represents either a standalone expression, a
     * print operation, an assign operation, a if statement or a while statement.
@@ -123,6 +134,8 @@ object LMon {
     case ExprStmt(e: Expr)
     case IfStmt(cond: Expr, thenBranch: List[Stmt], elseBranch: List[Stmt])
     case WhileStmt(cond: Expr, body: List[Stmt])
+    case StoreStmt(ptr: Atom, offset: Int, value: Atom)
+    case ReturnStmt(atom: Atom)
 
   /** An expression in LMonWhile can be a constant value (Long or Boolean), a
     * unary operation, a binary operation, a function call with the restriction
@@ -140,6 +153,9 @@ object LMon {
     case AtomExpr(a: Atom)
     case IfExpr(condExpr: Expr, thenExpr: Expr, elseExpr: Expr)
     case Begin(stmts: List[Stmt], e: Expr)
+    case Allocate(size: Long)
+    case Load(ptr: Atom, offset: Long)
+    case Call(name: String, args: List[Atom])
 }
 
 /** The abstract syntax tree (AST) for the CIf language.
@@ -173,6 +189,9 @@ object CIr {
     case BinaryNumericOp(op: BinaryNumericOperator, lhs: Atom, rhs: Atom)
     case Compare(cmp: CompareOperator, lhs: Atom, rhs: Atom)
     case ReadIntCall
+    case Allocate(size: Long)
+    case Load(ptr: Atom, offset: Long)
+    case Call(name: String, args: List[Atom])
 
   /** A statement in CIf represents either a standalone expression, a print
     * operation or an assign operation.
@@ -181,6 +200,7 @@ object CIr {
     case PrintStmt(a: Atom)
     case ExprStmt(e: Expr)
     case AssignStmt(id: Identifier, e: Expr)
+    case StoreStmt(ptr: Atom, offset: Int, value: Atom)
 
   /** A tail in CIf represents either a return, jump via goto or a conditional
     * jump via goto.
@@ -194,6 +214,12 @@ object CIr {
     */
   case class BasicBlock(stmts: List[Stmt], tail: Tail)
 
+  case class FunctionDef(
+      name: String,
+      params: List[Param],
+      body: Map[Label, BasicBlock]
+  )
+
   /** A C program in CIf represents a collection of blocks, where each block is
     * identified by a unique name (String) and contains a list of statements and
     * a tail.
@@ -201,22 +227,37 @@ object CIr {
     * @param blocks
     */
   case class CProgram(
-      blocks: Map[Label, BasicBlock]
-  ) // also here we could use Identifier instead of String
+      funDefs: List[FunctionDef]
+  )
 
 }
 
-/** The x86VarIf intermediate representation (IR) for the LMonIf language.
+/** The x86Var intermediate representation (IR) for the LMon language.
   *
   * Represents the structure of LMonIf programs after instruction selection and
   * before final assembly generation.
   */
 object x86Var {
   import x86.Cc
-  import CommonNodes.Identifier
+  import CommonNodes.{Identifier, Param}
   export Instr.*
 
-  case class Program(blocks: Map[String, List[x86Var.Instr]])
+  val argumentRegisters: List[x86.Reg] = List(
+    x86.Reg.Rdi, // first argument
+    x86.Reg.Rsi, // second argument
+    x86.Reg.Rdx, // third argument
+    x86.Reg.Rcx, // fourth argument
+    x86.Reg.R8, // fifth argument
+    x86.Reg.R9 // sixth argument
+  )
+
+  case class FunctionDef(
+      name: String,
+      params: List[Param],
+      body: Map[String, List[x86Var.Instr]]
+  )
+
+  case class Program(funDefs: List[FunctionDef])
 
   /*
    * An identifier in x86VarIf represents a variable name or label.
@@ -267,4 +308,8 @@ object x86Var {
     case TailJmp(arg: Arg, arity: Int)
     case AndQ(src: Arg, dest: Location)
     case SarQ(src: Arg, dest: Location)
+
+    // additional instructions to model read and write operation to the Heap
+    case LoadQ(dest: Variable, base: Variable, offset: Long)
+    case StoreQ(base: Variable, offset: Long, src: Arg)
 }

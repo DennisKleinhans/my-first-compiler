@@ -4,6 +4,7 @@ import compiler.CommonNodes.*
 import compiler.{LCore, LMon}
 import LMon.Expr
 import LMon.Expr.AtomExpr
+import compiler.CommonNodes.Atom.Constant
 
 object RemoveComplexOperands {
 
@@ -49,7 +50,7 @@ object RemoveComplexOperands {
   def removeComplexOperands(
       exp: LCore.Expr,
       gen: NameGenerator
-  ): (List[LMon.AssignStmt], LMon.Expr) = exp match
+  ): (List[LMon.Stmt], LMon.Expr) = exp match
     case LCore.Constant(n) => (Nil, Expr.AtomExpr(Atom.Constant(n)))
 
     case LCore.ConstantBool(b) => (Nil, Expr.AtomExpr(Atom.ConstantBool(b)))
@@ -135,16 +136,84 @@ object RemoveComplexOperands {
         AtomExpr(Atom.Variable(tmpIdentifier))
       )
 
+    case LCore.Tuple(elements) =>
+      // simplify all tuple elements
+      val (assignments, simpleElements) = elements.foldLeft(
+        (List.empty[LMon.Stmt], List.empty[LMon.Expr])
+      ) { case ((assignAcc, atomAcc), expr) =>
+        val (assigns, atom) = removeComplexOperands(expr, gen)
+        (assignAcc ++ assigns, atomAcc :+ atom)
+      }
+
+      // variable to store the pointer
+      val ptrId = gen.freshName()
+      val ptrVar = Atom.Variable(ptrId)
+
+      // calculate size of the tuple + tag for metadata like length
+      val numElements = simpleElements.size
+      val sizeBytes = (numElements + 1) * 8
+
+      // allocate the needed memory and assign the returned pointer to the pointer variable
+      val allocAssign: LMon.AssignStmt =
+        LMon.AssignStmt(ptrId, LMon.Allocate(sizeBytes))
+
+      // store the length tag at the first 8 bytes where the pointer points to
+      val tagLenStore = LMon.StoreStmt(ptrVar, 0, Constant(numElements))
+
+      // store every tuple element at it offset starting at the pointer as the base
+      val elementStores =
+        simpleElements.zipWithIndex.map { case (atomExpr, i) =>
+          LMon.StoreStmt(ptrVar, 8 * (i + 1), extractAtom(atomExpr))
+
+        }
+      (
+        allocAssign :: tagLenStore :: assignments ++ elementStores,
+        AtomExpr(Atom.Variable(ptrId))
+      )
+
+    case LCore.TupleProjection(tuple, index) =>
+      val (assignments, tupleAtom) = removeComplexOperands(tuple, gen)
+      val ptrId = gen.freshName()
+      val ptrVar = Atom.Variable(ptrId)
+
+      // just use the index directly here, because the projections start with tuple._1
+      val loadAssign = LMon.AssignStmt(
+        ptrId,
+        LMon.Load(extractAtom(tupleAtom), 8 * (index + 1))
+      )
+
+      (assignments :+ loadAssign, AtomExpr(ptrVar))
+
+    case LCore.TupleLen(tuple) =>
+      val (assignments, tupleAtom) = removeComplexOperands(tuple, gen)
+      val ptrId = gen.freshName()
+      val ptrVar = Atom.Variable(ptrId)
+
+      // access the length tag
+      val loadAssign =
+        LMon.AssignStmt(ptrId, LMon.Load(extractAtom(tupleAtom), 0))
+
+      (assignments :+ loadAssign, AtomExpr(ptrVar))
+
+    case LCore.Call(name, args) =>
+      val (assignments, simpleArgs) = args.foldLeft(
+        (List.empty[LMon.Stmt], List.empty[Atom])
+      ) { case ((assignAcc, atomAcc), expr) =>
+        val (assigns, atom) = removeComplexOperands(expr, gen)
+        (assignAcc ++ assigns, atomAcc :+ extractAtom(atom))
+      }
+      (assignments, LMon.Call(name, simpleArgs))
+
     case e @ LCore.BinaryLogicOp(_, _, _) =>
       sys error s"rached BinaryLogicOp ($e), but this should not happen, because this would be removed in the shrink pass"
 
     /** Simplifies all expressions within a statement by extracting complex
       * subexpressions.
       *
-      * This function applies `removeComplexOperands` to each expression inside the
-      * statement (whether it's an assignment, print, or standalone expression).
-      * Any intermediate computations are lifted into separate assignment
-      * statements.
+      * This function applies `removeComplexOperands` to each expression inside
+      * the statement (whether it's an assignment, print, or standalone
+      * expression). Any intermediate computations are lifted into separate
+      * assignment statements.
       *
       * @param stmt
       *   the statement to simplify
@@ -200,11 +269,23 @@ object RemoveComplexOperands {
           )
         )
 
+      case LCore.ReturnStmt(e) =>
+        val (assignments, expr) = removeComplexOperands(e, gen)
+        expr match
+          case AtomExpr(a) =>
+            assignments :+ LMon.ReturnStmt(a)
+          case other =>
+            val tmpIdentifier = gen.freshName()
+            assignments ++ List(
+              LMon.AssignStmt(tmpIdentifier, other),
+              LMon.ReturnStmt(Atom.Variable(tmpIdentifier))
+            )
+
       /** Simplifies all statements in a module by flattening expressions
         * throughout.
         *
-        * Applies `removeComplexOperands` to each statement in the module and combines
-        * all resulting statements into a new, fully simplified module.
+        * Applies `removeComplexOperands` to each statement in the module and
+        * combines all resulting statements into a new, fully simplified module.
         *
         * @param module
         *   the module to simplify
@@ -216,6 +297,12 @@ object RemoveComplexOperands {
       module: LCore.Module,
       gen: NameGenerator = NameGenerator()
   ): LMon.Module =
-    val simplifiedStmts = module.stmts.flatMap(removeComplexOperands(_, gen))
-    LMon.Module(simplifiedStmts)
+    val funDefs = module.funDefs.map { funDef =>
+      LMon.FunctionDef(
+        funDef.name,
+        funDef.params,
+        funDef.body.flatMap(removeComplexOperands(_, gen))
+      )
+    }
+    LMon.Module(funDefs)
 }

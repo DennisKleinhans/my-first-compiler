@@ -279,39 +279,43 @@ class RemoveComplexOperandsTests extends FunSuite {
   test("simplify to LMonVar - nested arithmetic") {
     val program = "1 + (2+2) -8"
     val result = removeComplexOperands(
-      LCoreReader.fromSExpToModule(parse(program))
+      shrink(LCoreReader.fromSExpToModule(parse(program)))
     )
 
     val expected = LMon.Module(
       List(
-        LMon.AssignStmt(
-          Identifier("$tmp$_1"),
-          LMon.BinaryNumericOp(
-            BinaryNumericOperator.Add,
-            Atom.Constant(2),
-            Atom.Constant(2)
-          )
-        ),
-        LMon.AssignStmt(
-          Identifier("$tmp$_2"),
-          LMon.BinaryNumericOp(
-            BinaryNumericOperator.Add,
-            Atom.Constant(1),
-            Atom.Variable(Identifier("$tmp$_1"))
-          )
-        ),
-        LMon.AssignStmt(
-          Identifier("$tmp$_3"),
-          LMon.BinaryNumericOp(
-            BinaryNumericOperator.Sub,
-            Atom.Variable(Identifier("$tmp$_2")),
-            Atom.Constant(8)
-          )
-        ),
-        LMon.ExprStmt(
-          LMon.AtomExpr(
-            Atom.Variable(Identifier("$tmp$_3"))
-          )
+        LMon.FunctionDef(
+          "main",
+          Nil,
+          LMon.AssignStmt(
+            Identifier("$tmp$_1"),
+            LMon.BinaryNumericOp(
+              BinaryNumericOperator.Add,
+              Atom.Constant(2),
+              Atom.Constant(2)
+            )
+          ) ::
+            LMon.AssignStmt(
+              Identifier("$tmp$_2"),
+              LMon.BinaryNumericOp(
+                BinaryNumericOperator.Add,
+                Atom.Constant(1),
+                Atom.Variable(Identifier("$tmp$_1"))
+              )
+            ) ::
+            LMon.AssignStmt(
+              Identifier("$tmp$_3"),
+              LMon.BinaryNumericOp(
+                BinaryNumericOperator.Sub,
+                Atom.Variable(Identifier("$tmp$_2")),
+                Atom.Constant(8)
+              )
+            ) ::
+            LMon.ExprStmt(
+              LMon.AtomExpr(
+                Atom.Variable(Identifier("$tmp$_3"))
+              )
+            ) :: LMon.ReturnStmt(Constant(0)) :: Nil
         )
       )
     )
@@ -321,42 +325,45 @@ class RemoveComplexOperandsTests extends FunSuite {
 
   test("simplify to LMonIf - IfExpr") {
     val input = "if 1==1 then 1+1 else 2+2"
-    val output = removeComplexOperands(
-      LCoreReader.fromSExpToModule(parse(input))
-    )
+    val output =
+      removeComplexOperands(shrink(LCoreReader.fromSExpToModule(parse(input))))
 
     val expected = LMon.Module(
       List(
-        LMon.ExprStmt(
-          LMon.IfExpr(
-            LMon.Compare(CompareOperator.Eq, Constant(1), Constant(1)),
-            LMon.Begin(
-              List(
-                LMon.AssignStmt(
-                  Identifier("$tmp$_1"),
-                  LMon.BinaryNumericOp(
-                    BinaryNumericOperator.Add,
-                    Constant(1),
-                    Constant(1)
+        LMon.FunctionDef(
+          "main",
+          Nil,
+          LMon.ExprStmt(
+            LMon.IfExpr(
+              LMon.Compare(CompareOperator.Eq, Constant(1), Constant(1)),
+              LMon.Begin(
+                List(
+                  LMon.AssignStmt(
+                    Identifier("$tmp$_1"),
+                    LMon.BinaryNumericOp(
+                      BinaryNumericOperator.Add,
+                      Constant(1),
+                      Constant(1)
+                    )
                   )
-                )
+                ),
+                LMon.AtomExpr(Variable(Identifier("$tmp$_1")))
               ),
-              LMon.AtomExpr(Variable(Identifier("$tmp$_1")))
-            ),
-            LMon.Begin(
-              List(
-                LMon.AssignStmt(
-                  Identifier("$tmp$_2"),
-                  LMon.BinaryNumericOp(
-                    BinaryNumericOperator.Add,
-                    Constant(2),
-                    Constant(2)
+              LMon.Begin(
+                List(
+                  LMon.AssignStmt(
+                    Identifier("$tmp$_2"),
+                    LMon.BinaryNumericOp(
+                      BinaryNumericOperator.Add,
+                      Constant(2),
+                      Constant(2)
+                    )
                   )
-                )
-              ),
-              LMon.AtomExpr(Variable(Identifier("$tmp$_2")))
+                ),
+                LMon.AtomExpr(Variable(Identifier("$tmp$_2")))
+              )
             )
-          )
+          ) :: LMon.ReturnStmt(Constant(0)) :: Nil
         )
       )
     )
@@ -365,41 +372,27 @@ class RemoveComplexOperandsTests extends FunSuite {
   }
 
   test("simplify Module - IfStmt") {
-
+    val input = "if (1 == 1){print(1)} else {print(2)}"
+    val output =
+      removeComplexOperands(shrink(LCoreReader.fromSExpToModule(parse(input))))
     val expected = LMon.Module(
       List(
-        LMon.AssignStmt(
-          Identifier("$tmp$_1"),
-          LMon
-            .Compare(CompareOperator.Eq, Atom.Constant(1), Atom.Constant(1))
-        ),
-        LMon.IfStmt(
-          LMon.AtomExpr(Atom.Variable(Identifier("$tmp$_1"))),
+        LMon.FunctionDef(
+          "main",
+          List(),
           List(
-            LMon.AssignStmt(
-              Identifier("$tmp$_2"),
-              LMon.BinaryNumericOp(
-                BinaryNumericOperator.Add,
-                Atom.Constant(1),
-                Atom.Constant(1)
-              )
+            LMon.IfStmt(
+              LMon.Compare(CompareOperator.Eq, Constant(1), Constant(1)),
+              List(LMon.PrintStmt(Constant(1))),
+              List(LMon.PrintStmt(Constant(2)))
             ),
-            LMon.PrintStmt(Atom.Variable(Identifier("$tmp$_2")))
-          ),
-          List(
-            LMon.AssignStmt(
-              Identifier("$tmp$_3"),
-              LMon.BinaryNumericOp(
-                BinaryNumericOperator.Add,
-                Atom.Constant(2),
-                Atom.Constant(2)
-              )
-            ),
-            LMon.PrintStmt(Atom.Variable(Identifier("$tmp$_3")))
+            LMon.ReturnStmt(Constant(0))
           )
         )
       )
     )
+
+    assertEquals(output, expected)
   }
 }
 
@@ -409,24 +402,29 @@ class selectInstructionsTests extends FunSuite {
     val result = selectInstructions(
       explicateControl(
         removeComplexOperands(
-          LCoreReader.fromSExpToModule((parse(programm)))
+          shrink(LCoreReader.fromSExpToModule((parse(programm))))
         )
       )
     )
     val expected = x86Var.Program(
-      Map(
-        "start" -> List(
-          x86Var
-            .MovQ(
-              x86Var.Immediate(1),
-              x86Var.Variable(Identifier("$tmp$_1"))
-            ),
-          x86Var.AddQ(
-            x86Var.Immediate(2),
-            x86Var.Variable(Identifier("$tmp$_1"))
-          ),
-          x86Var.MovQ(x86Var.Immediate(0L), Reg.Rax),
-          x86Var.Jmp("conclusion")
+      List(
+        x86Var.FunctionDef(
+          "main",
+          Nil,
+          Map(
+            "main_start" -> List(
+              x86Var.MovQ(
+                x86Var.Immediate(1),
+                x86Var.Variable(Identifier("$tmp$_1"))
+              ),
+              x86Var.AddQ(
+                x86Var.Immediate(2),
+                x86Var.Variable(Identifier("$tmp$_1"))
+              ),
+              x86Var.MovQ(x86Var.Immediate(0), Reg.Rax),
+              x86Var.Jmp("main_conclusion")
+            )
+          )
         )
       )
     )
@@ -438,75 +436,82 @@ class selectInstructionsTests extends FunSuite {
     val result = selectInstructions(
       explicateControl(
         removeComplexOperands(
-          LCoreReader.fromSExpToModule((parse(programm)))
+          shrink(LCoreReader.fromSExpToModule((parse(programm))))
         )
       )
     )
     val expected = x86Var.Program(
-      Map(
-        "start" -> List(
-          x86Var.CallQ("read_int", 0),
-          x86Var.MovQ(
-            x86.Reg.Rax,
-            x86Var.Variable(Identifier("$tmp$_1"))
-          ),
-          x86Var
-            .MovQ(
-              x86Var.Immediate(1),
-              x86Var.Variable(Identifier("$tmp$_2"))
-            ),
-          x86Var.AddQ(
-            x86Var.Variable(Identifier("$tmp$_1")),
-            x86Var.Variable(Identifier("$tmp$_2"))
-          ),
-          x86Var.MovQ(x86Var.Immediate(0L), Reg.Rax),
-          x86Var.Jmp("conclusion")
+      List(
+        x86Var.FunctionDef(
+          "main",
+          Nil,
+          Map(
+            "main_start" -> List(
+              x86Var.CallQ("read_int", 0),
+              x86Var.MovQ(Reg.Rax, x86Var.Variable(Identifier("$tmp$_1"))),
+              x86Var.MovQ(
+                x86Var.Immediate(1),
+                x86Var.Variable(Identifier("$tmp$_2"))
+              ),
+              x86Var.AddQ(
+                x86Var.Variable(Identifier("$tmp$_1")),
+                x86Var.Variable(Identifier("$tmp$_2"))
+              ),
+              x86Var.MovQ(x86Var.Immediate(0), Reg.Rax),
+              x86Var.Jmp("main_conclusion")
+            )
+          )
         )
       )
     )
+
+    assertEquals(result, expected)
   }
 
   test("selectInstructions - complex arithmetic") {
     val programm = "1+(3+4)-8"
     val expected = x86Var.Program(
-      Map(
-        "start" -> List(
-          x86Var
-            .MovQ(
-              x86Var.Immediate(3),
-              x86Var.Variable(Identifier("$tmp$_1"))
-            ),
-          x86Var
-            .AddQ(
-              x86Var.Immediate(4),
-              x86Var.Variable(Identifier("$tmp$_1"))
-            ),
-          x86Var
-            .MovQ(
-              x86Var.Immediate(1),
-              x86Var.Variable(Identifier("$tmp$_2"))
-            ),
-          x86Var.AddQ(
-            x86Var.Variable(Identifier("$tmp$_1")),
-            x86Var.Variable(Identifier("$tmp$_2"))
-          ),
-          x86Var.MovQ(
-            x86Var.Variable(Identifier("$tmp$_2")),
-            x86Var.Variable(Identifier("$tmp$_3"))
-          ),
-          x86Var.SubQ(
-            x86Var.Immediate(8),
-            x86Var.Variable(Identifier("$tmp$_3"))
-          ),
-          x86Var.MovQ(x86Var.Immediate(0L), Reg.Rax),
-          x86Var.Jmp("conclusion")
+      List(
+        x86Var.FunctionDef(
+          "main",
+          Nil,
+          Map(
+            "main_start" -> List(
+              x86Var.MovQ(
+                x86Var.Immediate(3),
+                x86Var.Variable(Identifier("$tmp$_1"))
+              ),
+              x86Var.AddQ(
+                x86Var.Immediate(4),
+                x86Var.Variable(Identifier("$tmp$_1"))
+              ),
+              x86Var.MovQ(
+                x86Var.Immediate(1),
+                x86Var.Variable(Identifier("$tmp$_2"))
+              ),
+              x86Var.AddQ(
+                x86Var.Variable(Identifier("$tmp$_1")),
+                x86Var.Variable(Identifier("$tmp$_2"))
+              ),
+              x86Var.MovQ(
+                x86Var.Variable(Identifier("$tmp$_2")),
+                x86Var.Variable(Identifier("$tmp$_3"))
+              ),
+              x86Var.SubQ(
+                x86Var.Immediate(8),
+                x86Var.Variable(Identifier("$tmp$_3"))
+              ),
+              x86Var.MovQ(x86Var.Immediate(0), Reg.Rax),
+              x86Var.Jmp("main_conclusion")
+            )
+          )
         )
       )
     )
     val result = selectInstructions(
       explicateControl(
         removeComplexOperands(
-          LCoreReader.fromSExpToModule(parse(programm))
+          shrink(LCoreReader.fromSExpToModule(parse(programm)))
         )
       )
     )
@@ -588,23 +593,31 @@ class ShrinkTests extends FunSuite {
     assertEquals(shrink(nestedAndInAssign), expected)
   }
 
-  test("shrinkModule - assing and print") {
-    val input = LCore.Module(nestedAndInAssign :: nestedAndInPrint :: Nil)
+  test("shrinkModule - assign and print") {
+    val input =
+      LCore.Module(List.empty, nestedAndInAssign :: nestedAndInPrint :: Nil)
     val expected = LCore.Module(
-      (LCore.AssignStmt(
-        Identifier("x"),
-        LCore.IfExpr(
-          LCore.Constant(1),
-          LCore.Constant(2),
-          LCore.ConstantBool(false)
+      List(
+        LCore.FunctionDef(
+          "main",
+          Nil,
+          (LCore.AssignStmt(
+            Identifier("x"),
+            LCore.IfExpr(
+              LCore.Constant(1),
+              LCore.Constant(2),
+              LCore.ConstantBool(false)
+            )
+          )) :: LCore.PrintStmt(
+            LCore.IfExpr(
+              LCore.Constant(1),
+              LCore.Constant(2),
+              LCore.ConstantBool(false)
+            )
+          ) :: LCore.ReturnStmt(LCore.Constant(0)) :: Nil
         )
-      )) :: LCore.PrintStmt(
-        LCore.IfExpr(
-          LCore.Constant(1),
-          LCore.Constant(2),
-          LCore.ConstantBool(false)
-        )
-      ) :: Nil
+      ),
+      Nil
     )
     assertEquals(shrink(input), expected)
   }
@@ -615,6 +628,7 @@ class EndToEndTests extends FunSuite {
     val printCall = "print(1+1)"
 
     val expected = LCore.Module(
+      List.empty,
       LCore.PrintStmt(
         LCore.BinaryNumericOp(
           BinaryNumericOperator.Add,
@@ -629,6 +643,7 @@ class EndToEndTests extends FunSuite {
   test("End-to-End: object language -> AST - IfExpr") {
     val input = "if 1 < 2 then true else false"
     val expected = LCore.Module(
+      List.empty,
       LCore.ExprStmt(
         LCore.IfExpr(
           LCore.Compare(
@@ -647,6 +662,7 @@ class EndToEndTests extends FunSuite {
   test("End-to-End: object language -> AST - IfStmt") {
     val input = "if (1 < 2) {true} else {false}"
     val expected = LCore.Module(
+      List.empty,
       LCore.IfStmt(
         LCore
           .Compare(CompareOperator.Lt, LCore.Constant(1), LCore.Constant(2)),
@@ -660,6 +676,7 @@ class EndToEndTests extends FunSuite {
   test("End-to-End: object language -> AST - BinaryLogicOp") {
     val input = "true && false"
     val expected = LCore.Module(
+      List.empty,
       LCore.ExprStmt(
         LCore.BinaryLogicOp(
           BinaryLogicOperator.And,
@@ -674,6 +691,7 @@ class EndToEndTests extends FunSuite {
   test("End-to-End: object language -> AST - UnaryLogicOp") {
     val input = "!(1 < 2)"
     val expected = LCore.Module(
+      List.empty,
       LCore.ExprStmt(
         LCore.UnaryLogicOp(
           UnaryLogicOperator.Not,
