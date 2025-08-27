@@ -4,3 +4,6 @@
 /project/.bloop/
 /.bsp/
 /out/
+.bloop
+.metals
+.vscode
