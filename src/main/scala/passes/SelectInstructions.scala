@@ -225,8 +225,8 @@ object SelectInstructions {
         val dest = argFromAtom(cmp.lhs)
         List(
           x86Var.CmpQ(src, dest),
-          x86Var.JmpIf(cc, thenGoto.lable),
-          x86Var.Jmp(elseGoto.lable)
+          x86Var.JmpIf(cc, thenGoto.label),
+          x86Var.Jmp(elseGoto.label)
         )
     }
 

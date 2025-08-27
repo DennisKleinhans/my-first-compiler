@@ -141,11 +141,11 @@ object ExplicateControl {
   ): CIr.BasicBlock = {
     expr match {
       case LMon.IfExpr(cond, thn, els) =>
-        // 1. Create a new label for the continuation block and insert it into basicBlocks
+        // Create a new label for the continuation block and insert it into basicBlocks
         val contLabel = LabelGenerator.freshBlockLabel()
         basicBlocks(contLabel) = continuation
 
-        // 2. Translate the “then” branch so that it computes into `id` and then jumps to contLabel
+        // Translate the “then” branch so that it computes into `id` and then jumps to contLabel
         val thenBlock = explicateAssign(
           thn,
           id,
@@ -153,7 +153,7 @@ object ExplicateControl {
           basicBlocks
         )
 
-        // 3. Translate the “else” branch similarly
+        // Translate the “else” branch similarly
         val elseBlock = explicateAssign(
           els,
           id,
@@ -161,14 +161,14 @@ object ExplicateControl {
           basicBlocks
         )
 
-        // 4. Generate a predicate block that tests `cond` to jump to either thenBlock or elseBlock
+        // Generate a predicate block that tests `cond` to jump to either thenBlock or elseBlock
         explicatePred(cond, thenBlock, elseBlock, basicBlocks)
 
       case LMon.Begin(stmts, expr) =>
-        // 1. Recursively translate the final expression, which will store its result into `id` and end with a Goto(continuation).
+        // Recursively translate the final expression, which will store its result into `id` and end with a Goto(continuation).
         val assignBlock = explicateAssign(expr, id, continuation, basicBlocks)
 
-        // 2. Fold all preceding statements in reverse order so that each Stmt’s translation chains into the block returned for innerExpr.
+        // Fold all preceding statements in reverse order so that each Stmt’s translation chains into the block returned for innerExpr.
         stmts.foldRight(assignBlock) { (stmt, cont) =>
           explicateStmt(stmt, cont, basicBlocks)
         }
@@ -411,11 +411,11 @@ object ExplicateControl {
         explicateEffect(expr, continuation, basicBlocks)
 
       case LMon.IfStmt(cond, thenBranch, elseBranch) =>
-        // 1. Create a new label for the join‐continuation and store `continuation` under it.
+        // Create a new label for the join‐continuation and store `continuation` under it.
         val contLabel = LabelGenerator.freshBlockLabel()
         basicBlocks(contLabel) = continuation
 
-        // 2. Build the “then” chain: each stmt in thenBranch, folded right, ending with Goto(contLabel)
+        // Build the “then” chain: each stmt in thenBranch, folded right, ending with Goto(contLabel)
         val thenBlock =
           thenBranch.foldRight(
             CIr.BasicBlock(List.empty, CIr.Goto(contLabel))
@@ -423,7 +423,7 @@ object ExplicateControl {
             explicateStmt(stmt, cont, basicBlocks)
           }
 
-        // 3. Build the “else” chain similarly
+        // Build the “else” chain similarly
         val elseBlock =
           elseBranch.foldRight(
             CIr.BasicBlock(List.empty, CIr.Goto(contLabel))
@@ -431,26 +431,26 @@ object ExplicateControl {
             explicateStmt(stmt, cont, basicBlocks)
           }
 
-        // 4. Create a predicate‐block that tests `cond` and jumps to either thenBlock or elseBlock
+        // Create a predicate‐block that tests `cond` and jumps to either thenBlock or elseBlock
         explicatePred(cond, thenBlock, elseBlock, basicBlocks)
 
       case LMon.WhileStmt(cond, body) =>
-        // 1. Create fresh labels for the condition, body, and done blocks
+        // Create fresh labels for the condition, body, and done blocks
         val condLbl = LabelGenerator.freshCondLable()
         val bodyLbl = LabelGenerator.freshBodyLabel()
         val doneLbl = LabelGenerator.freshDoneLabel()
 
-        // 2. Store the continuation under doneLbl
+        // Store the continuation under doneLbl
         basicBlocks(doneLbl) = continuation
 
-        // 3. bodyLbl: Translate the body statements, ending with a jump back to condLbl
+        // bodyLbl: Translate the body statements, ending with a jump back to condLbl
         val backToCond = CIr.BasicBlock(Nil, CIr.Goto(condLbl))
         val bodyEntry = body.foldRight(backToCond) { (stmt, cont) =>
           explicateStmt(stmt, cont, basicBlocks)
         }
         basicBlocks(bodyLbl) = bodyEntry
 
-        // 4. condLbl: Create a new BasicBlock that tests the condition and jumps to either bodyLbl or doneLbl
+        // condLbl: Create a new BasicBlock that tests the condition and jumps to either bodyLbl or doneLbl
         val thnBlock = CIr.BasicBlock(Nil, CIr.Goto(bodyLbl))
         val elsBlock = CIr.BasicBlock(Nil, CIr.Goto(doneLbl))
 
@@ -530,7 +530,6 @@ object ExplicateControl {
     val startLabel = funDef.name + "_start"
     basicBlocks(startLabel) = startBlock
 
-    // 6) Baue das CIr.FunctionDef
     CIr.FunctionDef(
       name = funDef.name,
       params = funDef.params,
@@ -571,18 +570,5 @@ object ExplicateControl {
     val funDefs = module.funDefs.map(explicateFunctionDef)
 
     CIr.CProgram(funDefs)
-
-    // val basicBlocks = mutable.Map[String, CIr.BasicBlock]()
-
-    // // construct start block with Return(0) as tail
-    // val startBlock = module.stmts.foldRight(
-    //   CIr.BasicBlock(List.empty, CIr.Return(CIr.AtomExpr(Constant(0L))))
-    // ) { (stmt, cont) => explicateStmt(stmt, cont, basicBlocks) }
-
-    // // add startBlock
-    // val startLabel = "start"
-    // basicBlocks(startLabel) = startBlock
-
-    // CIr.CProgram(basicBlocks.toMap)
   }
 }

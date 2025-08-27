@@ -6,7 +6,7 @@ import lang.SExp.*
 import lang.parse
 import CommonNodes.*
 import CommonNodes.Atom.*
-import LIntInterpreter.*
+import LCoreInterpreter.*
 import munit.Tag
 import x86Var.Instr
 import x86.Reg
@@ -177,21 +177,21 @@ class LIntInterpreterTests extends FunSuite {
 
   test("LIntInterpreter.evalExpr - binary: 1 + 1") {
     assertEquals(
-      LIntInterpreter.evalExpr(LCoreReader.fromSExpToExpr(sexpOnePlusOne)),
+      LCoreInterpreter.evalExpr(LCoreReader.fromSExpToExpr(sexpOnePlusOne)),
       2L
     )
   }
 
   test("LIntInterpreter.evalExpr - binary: 4 - 2") {
     assertEquals(
-      LIntInterpreter.evalExpr(LCoreReader.fromSExpToExpr(sexpFourMinusTwo)),
+      LCoreInterpreter.evalExpr(LCoreReader.fromSExpToExpr(sexpFourMinusTwo)),
       2L
     )
   }
 
   test("LIntInterpreter.evalExpr - unary: -8") {
     assertEquals(
-      LIntInterpreter.evalExpr(LCoreReader.fromSExpToExpr(sexpMinusEight)),
+      LCoreInterpreter.evalExpr(LCoreReader.fromSExpToExpr(sexpMinusEight)),
       -8L
     )
   }
@@ -202,7 +202,7 @@ class LIntInterpreterTests extends FunSuite {
 
     val outputStream = new java.io.ByteArrayOutputStream()
     Console.withOut(outputStream) {
-      LIntInterpreter.evalModule(LCoreReader.fromSExpToModule(parse(input)))
+      LCoreInterpreter.evalModule(LCoreReader.fromSExpToModule(parse(input)))
     }
 
     val actualOutput = outputStream.toString
@@ -221,7 +221,7 @@ class LIntInterpreterTests extends FunSuite {
         LCore.Constant(2)
       )
     val expected = LCore.Constant(3)
-    assertEquals(LIntInterpreter.partialEvalExpr(input), expected)
+    assertEquals(LCoreInterpreter.partialEvalExpr(input), expected)
   }
 
   test("LIntInterpreter.partialEvalExpr - nested folding") {
@@ -235,7 +235,7 @@ class LIntInterpreterTests extends FunSuite {
       LCore.Constant(1)
     )
     val expected = LCore.Constant(4)
-    assertEquals(LIntInterpreter.partialEvalExpr(input), expected)
+    assertEquals(LCoreInterpreter.partialEvalExpr(input), expected)
   }
 
   test("LIntInterpreter.partialEvalExpr - symbolic parts remain") {
@@ -254,7 +254,7 @@ class LIntInterpreterTests extends FunSuite {
         LCore.Constant(3),
         LCore.ReadIntCall
       )
-    assertEquals(LIntInterpreter.partialEvalExpr(input), expected)
+    assertEquals(LCoreInterpreter.partialEvalExpr(input), expected)
   }
 
   test("LIntInterpreter.partialEvalStatement - partially simplified print") {
@@ -267,7 +267,7 @@ class LIntInterpreterTests extends FunSuite {
         )
       )
     val expected = LCore.PrintStmt(LCore.Constant(2))
-    assertEquals(LIntInterpreter.partialEvalStatement(input), expected)
+    assertEquals(LCoreInterpreter.partialEvalStatement(input), expected)
   }
 }
 
@@ -710,7 +710,7 @@ class EndToEndTests extends FunSuite {
   test("End-to-End: object language -> eval result") {
     val program = "1 + (4 - 2) - (-8)"
     assertEquals(
-      LIntInterpreter.evalModule(LCoreReader.fromSExpToModule(parse(program))),
+      LCoreInterpreter.evalModule(LCoreReader.fromSExpToModule(parse(program))),
       11L
     )
   }

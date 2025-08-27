@@ -6,7 +6,7 @@ import CommonNodes.*
 
 /** Parser for converting S-Expressions into `AST`s.
   *
-  * Provides methods to translate serialized S-Expressions into structured LVar
+  * Provides methods to translate serialized S-Expressions into structured LCore
   * language features.
   */
 object LCoreReader {

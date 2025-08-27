@@ -4,8 +4,7 @@ import scala.compiletime.ops.long
 
 object CommonNodes {
 
-  /** An atom in can be a constant value (Long or Boolean) or a variable
-    * reference.
+  /** An atom can be a constant value (Long or Boolean) or a variable reference.
     */
   enum Atom:
     case Constant(n: Long)
@@ -55,9 +54,9 @@ object CommonNodes {
   case class Param(name: String)
 }
 
-/** The abstract syntax tree (AST) for the LWhile language.
+/** The abstract syntax tree (AST) for the top-level language.
   *
-  * Represents the structure of LWhile programs after parsing and before
+  * Represents the structure of LCore programs after parsing and before
   * interpretation or compilation.
   */
 object LCore {
@@ -65,17 +64,31 @@ object LCore {
   export Expr.*
   export Stmt.*
 
+  /** A function definition in LCore consists of a name, a list of parameters,
+    * and a body of statements.
+    *
+    * @param name
+    *   the name of the function
+    * @param params
+    *   the list of parameters for the function
+    * @param body
+    *   the body of statements for the function
+    */
   case class FunctionDef(name: String, params: List[Param], body: List[Stmt])
 
-  /** A module is the top-level program structure in LWhile.
+  /** A module is the top-level program structure in LCore and consists of
+    * function definitions and statements.
     *
+    * @param funDefs
+    *   the list of function definitions contained in the module
     * @param stmts
     *   the list of statements contained in the module
     */
   case class Module(funDefs: List[FunctionDef], stmts: List[Stmt])
 
-  /** A statement in LWhile represents either a standalone expression, a print
-    * operation, an assign operation, a if Statement or a while statement.
+  /** A statement in LCore represents either a standalone expression, a print
+    * operation, an assign operation, an if Statement, a while statement or a
+    * return statement.
     */
   enum Stmt:
     case ExprStmt(e: Expr)
@@ -85,9 +98,10 @@ object LCore {
     case WhileStmt(cond: Expr, body: List[Stmt])
     case ReturnStmt(expr: Expr)
 
-  /** An expression in LWhile can be a constant value (Long or Boolean), a
-    * Variable, a unary operation, a binary operation a function call, a compare
-    * operation or a if expression.
+  /** An expression in LCore describes a computation that produces a value. It
+    * can be a constant value (Long or Boolean), a unary operation, a binary
+    * operation, a function call, a variable reference, an if expression, a
+    * tuple, a tuple projection or a tuple length.
     */
   enum Expr:
     case Constant(n: Long)
@@ -106,10 +120,10 @@ object LCore {
     case Call(name: String, args: List[Expr])
 }
 
-/** The abstract syntax tree (AST) for the LMonWhile language.
+/** The abstract syntax tree (AST) for the LMon language.
   *
-  * Represents the structure of LMonWhile programs after parsing and before
-  * interpretation or compilation.
+  * Represents the structure of LMon programs where all expressions are in
+  * atomic form.
   */
 object LMon {
   import CommonNodes.*
@@ -117,16 +131,29 @@ object LMon {
   export Expr.*
   export Stmt.*
 
-  /** A module is the top-level program structure in LMonWhile.
+  /** A module is the top-level program structure in LMon and consists of
+    * function definitions.
     *
-    * @param stmts
-    *   the list of statements contained in the module
+    * @param funDefs
+    *   the list of function definitions contained in the module
     */
   case class Module(funDefs: List[FunctionDef])
+
+  /** A function definition in LMon consists of a name, a list of parameters,
+    * and a body of statements.
+    *
+    * @param name
+    *   the name of the function
+    * @param params
+    *   the list of parameters for the function
+    * @param body
+    *   the body of statements for the function
+    */
   case class FunctionDef(name: String, params: List[Param], body: List[Stmt])
 
-  /** A statement in LMonWhile represents either a standalone expression, a
-    * print operation, an assign operation, a if statement or a while statement.
+  /** A statement in LMon represents either a standalone expression, a print
+    * operation, an assign operation, an if statement, a while statement or a
+    * return statement.
     */
   enum Stmt:
     case AssignStmt(id: Identifier, rhs: Expr)
@@ -137,10 +164,11 @@ object LMon {
     case StoreStmt(ptr: Atom, offset: Int, value: Atom)
     case ReturnStmt(atom: Atom)
 
-  /** An expression in LMonWhile can be a constant value (Long or Boolean), a
-    * unary operation, a binary operation, a function call with the restriction
-    * to only accept atoms or a if expression also with the restiction to only
-    * accept atoms.
+  /** An expression in LMon can be a constant value (Long or Boolean), a unary
+    * operation, a binary operation, a function call with the restriction to
+    * only accept atoms or a if expression also with the restiction to only
+    * accept atoms. It can also be an Allocate or Load expression to model
+    * memory operations.
     */
   enum Expr:
     case Constant(n: Long)
@@ -158,14 +186,13 @@ object LMon {
     case Call(name: String, args: List[Atom])
 }
 
-/** The abstract syntax tree (AST) for the CIf language.
+/** The abstract syntax tree (AST) for the CIr language.
   *
-  * Represents the structure of CIf programs after parsing and before
-  * interpretation or compilation.
+  * Represents the structure of CIr programs.
   *
   * This AST is designed to represent a simplified version of C-like programming
   * constructs, focusing on expressions, statements, and control flow with
-  * if-else constructs.
+  * if-else constructs and while loops.
   */
 object CIr {
   import CommonNodes.*
@@ -176,10 +203,11 @@ object CIr {
 
   type Label = String
 
-  /** An expression in CIf can be a atom (Long, Boolean or Variable), a unary
+  /** An expression in CIr can be a atom (Long, Boolean or Variable), a unary
     * numeric operation, a binary numeric operation, a function call with the
     * restriction to only accept atoms or a Compare expression also with the
-    * restiction to only accept atoms.
+    * restiction to only accept atoms. It can also be an Allocate or Load
+    * expression to model memory operations.
     */
   enum Expr:
     case Constant(n: Long)
@@ -193,8 +221,8 @@ object CIr {
     case Load(ptr: Atom, offset: Long)
     case Call(name: String, args: List[Atom])
 
-  /** A statement in CIf represents either a standalone expression, a print
-    * operation or an assign operation.
+  /** A statement in CIr represents either a standalone expression, a print
+    * operation, an assign operation or a store operation for memory management.
     */
   enum Stmt:
     case PrintStmt(a: Atom)
@@ -202,25 +230,36 @@ object CIr {
     case AssignStmt(id: Identifier, e: Expr)
     case StoreStmt(ptr: Atom, offset: Int, value: Atom)
 
-  /** A tail in CIf represents either a return, jump via goto or a conditional
+  /** A tail in CIr represents either a return, jump via goto or a conditional
     * jump via goto.
     */
   enum Tail:
     case Return(e: Expr)
-    case Goto(lable: String) // could also be an Identifier instat of String
+    case Goto(label: String) // could also be an Identifier instat of String
     case If(cmp: Expr.Compare, thenGoto: Tail.Goto, elseGoto: Tail.Goto)
 
-  /** A basic block in CIf consists of a list of statements and a tail.
+  /** A basic block in CIr consists of a list of statements and a tail.
     */
   case class BasicBlock(stmts: List[Stmt], tail: Tail)
 
+  /** A function definition in CIr consists of a name, a list of parameters, and
+    * a body of basic blocks.
+    *
+    * @param name
+    *   the name of the function
+    * @param params
+    *   the list of parameters for the function
+    * @param body
+    *   the body of basic blocks for the function, represented as a map from
+    *   labels to basic blocks
+    */
   case class FunctionDef(
       name: String,
       params: List[Param],
       body: Map[Label, BasicBlock]
   )
 
-  /** A C program in CIf represents a collection of blocks, where each block is
+  /** A CProgram in CIr represents a collection of blocks, where each block is
     * identified by a unique name (String) and contains a list of statements and
     * a tail.
     *
@@ -232,9 +271,9 @@ object CIr {
 
 }
 
-/** The x86Var intermediate representation (IR) for the LMon language.
+/** The x86Var intermediate representation (IR) for the LCore language.
   *
-  * Represents the structure of LMonIf programs after instruction selection and
+  * Represents the structure of LCore programs after instruction selection and
   * before final assembly generation.
   */
 object x86Var {
@@ -251,34 +290,50 @@ object x86Var {
     x86.Reg.R9 // sixth argument
   )
 
+  /** A function definition in x86Var consists of a name, a list of parameters,
+    * and a body of x86Var instructions.
+    *
+    * @param name
+    *   the name of the function
+    * @param params
+    *   the list of parameters for the function
+    * @param body
+    *   the body of x86Var instructions for the function, represented as a map
+    *   from labels to lists of instructions
+    */
   case class FunctionDef(
       name: String,
       params: List[Param],
       body: Map[String, List[x86Var.Instr]]
   )
 
+  /** A program in x86Var represents a collection of function definitions.
+    *
+    * @param funDefs
+    *   the list of function definitions contained in the program
+    */
   case class Program(funDefs: List[FunctionDef])
 
   /*
-   * An identifier in x86VarIf represents a variable name or label.
-   * It is used to refer to variables in the x86VarIf instructions.
+   * An identifier in x86Var represents a variable name or label.
+   * It is used to refer to variables in the x86Var instructions.
    */
   case class Variable(id: Identifier)
 
   /*
-   * An immediate value in x86VarIf represents a constant integer that can be
+   * An immediate value in x86Var represents a constant integer that can be
    * used directly in instructions.
    */
   case class Immediate(n: Long)
 
-  /** A location in x86VarIf can be a register or a variable.
+  /** A location in x86Var can be a register or a variable.
     *
     * Registers are used for fast access to data, while variables represent
     * memory locations that may require stack allocation.
     */
   type Location = x86.Reg | x86.ByteReg | x86.Deref | x86.Global | Variable
 
-  /** An argument in x86VarIf can be a location (register or variable) or an
+  /** An argument in x86Var can be a location (register or variable) or an
     * immediate value (constant).
     *
     * This allows instructions to operate on both memory locations and immediate
@@ -286,7 +341,7 @@ object x86Var {
     */
   type Arg = Location | Immediate
 
-  /** An instruction in x86VarIf represents a single operation in the x86
+  /** An instruction in x86Var represents a single operation in the x86
     * architecture. It can be a move, push, pop, ret, arithmetic operation,
     * logic operation, jumps or a function call.
     */

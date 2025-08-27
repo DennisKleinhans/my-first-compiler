@@ -3,8 +3,8 @@ package compiler
 import CommonNodes.*
 import scala.io.StdIn
 
-/** Evaluates and partially evaluates LInt programs */
-object LIntInterpreter {
+/** Evaluates and partially evaluates LCore programs */
+object LCoreInterpreter {
 
   /** Fully evaluates an [[Expr]] to a [[Long]]
     *
